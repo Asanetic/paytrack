@@ -8,7 +8,7 @@ import {
 } from "../../apiUtils/dataControl/dataUtils";
 import { mosySendSMS } from "../../apiUtils/dataControl/send-sms";
 import { mosySendEmail } from "../../apiUtils/dataControl/send-gmail";
-import { processLoanPayment } from "../payments/logicControl/processLoanPayment";
+// import { processLoanPayment } from "../payments/logicControl/processLoanPayment";
 
 export async function POST(request) {
   try {
@@ -332,16 +332,16 @@ export async function POST(request) {
     // loans.loan_id, records it in THIS app's own payments table, and
     // SMS's the client. Best-effort/non-fatal — not every IPN through
     // this paybill is a loan repayment (see processLoanPayment.js).
-    let loanPaymentResult = null;
-    try {
-      loanPaymentResult = await processLoanPayment({
-        billRefNumber: BillRefNumber,
-        amount: TransAmount,
-        transactionCode: trans_id,
-      });
-    } catch (loanPaymentErr) {
-      console.error("processLoanPayment error:", loanPaymentErr);
-    }
+    // let loanPaymentResult = null;
+    // try {
+    //   loanPaymentResult = await processLoanPayment({
+    //     billRefNumber: BillRefNumber,
+    //     amount: TransAmount,
+    //     transactionCode: trans_id,
+    //   });
+    // } catch (loanPaymentErr) {
+    //   console.error("processLoanPayment error:", loanPaymentErr);
+    // }
 
     return NextResponse.json({
       ResultCode: 0,
