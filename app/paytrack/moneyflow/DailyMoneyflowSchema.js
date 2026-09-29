@@ -18,7 +18,7 @@ const moduleApi = apiRoutes.dailymoneyflow.base;
 export const DailyMoneyflowSchema = {
   entity: 'payment_transactions',              // DB table name; also drives default role names
                                      // (view_moneyflow / manage_moneyflow) and apiBase
-  label: 'Moneyflow',                 // optional, defaults to entity capitalized
+  label: 'Daily Transaction Summary',                 // optional, defaults to entity capitalized
   apiBase: moduleApi,
 
   //api endpint for importing data from csv
@@ -76,14 +76,21 @@ export const DailyMoneyflowSchema = {
   // role: 'manage_revenueplan' -- role required for this action
   //},
 
+
   profileActions: [
-    { key: 'back', label: 'Back to list', icon: 'arrow-left', variant: 'outline-secondary', navigateTo: '/paytrack/moneyflow/list', grid: false, form: true },
+    { key: 'back', label: 'Back to list', icon: 'arrow-left', variant: 'outline-secondary', navigateTo: '/paytrack/payments/list', grid: false, form: true },
     { key: 'save', label: 'Save', icon: 'save', variant: 'primary', grid: false, form: true, rowAction: false },
-    { key: 'delete', label: 'Delete', icon: 'trash', variant: 'outline-danger', confirm: 'Are you sure you want to delete this moneyflow?', editOnly: true, grid: false, form: true, rowAction: true, role: 'manage_moneyflow' },
-    { key: 'view', label: 'View more', icon: 'edit', rowAction: true },
-    { key: 'new', label: 'New Moneyflow', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/moneyflow/profile', grid: true, form: false, rowAction: false },
-    { key: 'clone', label: 'Clone Record', icon: 'copy', variant: 'outline-secondary', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_moneyflow' },
-    //{ key: 'filterByDate', label: 'Filter by date', icon: 'calendar', variant: 'outline-primary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'delete', label: 'Delete', icon: 'trash', variant: 'outline-danger', confirm: 'Are you sure you want to delete this payment?', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_payments' },
+    { key: 'view', label: 'View more', icon: 'edit', rowAction: false },
+    { key: 'new', label: 'New Payment', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/payments/profile', grid: false, form: false, rowAction: false },
+    { key: 'clone', label: 'Clone Record', icon: 'copy', variant: 'outline-secondary', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_payments' },
+    { key: 'filter_by_branch', label: 'Filter by branch', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_mode', label: 'Filter by mode', icon: 'credit-card', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_date', label: 'Filter by date', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_today', label: 'Today', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_yesterday', label: 'Yesterday', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_this_week', label: 'This week', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_this_month', label: 'This month', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
   ],
 
 
@@ -101,7 +108,7 @@ export const DailyMoneyflowSchema = {
 
   fieldGroups: [],
   // Field keys shown as columns in list view, in display order.
-  showInList: ['row_count', 'branch_name', 'name', 'transaction_id', 'external_ref', 'amount', 'currency', 'payer_name'],
+  showInList: ['row_count', 'transaction_at','payment_mode','branch_name', 'transaction_id', 'external_ref', 'amount', 'rate', 'rate_amount', 'disbursed', 'currency', 'payer_name'],
 
   //export columns these columns are used to generate upload csv template file
   exportColumns: ['branch_id', 'payment_source_id', 'transaction_id', 'external_ref', 'amount', 'currency', 'payer_name'],
@@ -111,6 +118,8 @@ export const DailyMoneyflowSchema = {
     { key: 'other_details', label: 'Other Details', columns: 3, fields: ['payer_phone', 'payment_mode', 'transaction_at', 'received_at', 'status', 'metadata', 'raw_payload', 'rate', 'rate_amount', 'disbursed'] },
   ],
 
+  
+
   fields: [
     // key: DB column name | label: shown on screen | type: drives input + SQL type
     { key: 'primkey', label: 'Primkey', type: 'number', system: true, editable: false },
@@ -119,7 +128,7 @@ export const DailyMoneyflowSchema = {
     ...resolveField('payment_source_id', { as: 'name' }),
     { key: 'transaction_id', label: 'Transaction Id', type: 'text' },
     { key: 'external_ref', label: 'External Ref', type: 'text' },
-    { key: 'amount', label: 'Amount', type: 'money' },
+    { key: 'amount', label: 'Amount', type: 'money', sum: true, decimals: 2 },
     { key: 'currency', label: 'Currency', type: 'text' },
     { key: 'payer_name', label: 'Payer Name', type: 'text', title: true },
     { key: 'payer_phone', label: 'Payer Phone', type: 'text' },
@@ -129,9 +138,9 @@ export const DailyMoneyflowSchema = {
     { key: 'status', label: 'Status', type: 'groupedSelect', endpoint: moduleApi, groupByField: 'status' },
     { key: 'metadata', label: 'Metadata', type: 'textarea' },
     { key: 'raw_payload', label: 'Raw Payload', type: 'textarea' },
-    { key: 'rate', label: 'Rate', type: 'text' },
-    { key: 'rate_amount', label: 'Rate Amount', type: 'money' },
-    { key: 'disbursed', label: 'Disbursed', type: 'text' },
+    { key: 'rate', label: 'Rate (%)', type: 'number' },
+    { key: 'rate_amount', label: 'Charges', type: 'money', sum: true, decimals: 2 },
+    { key: 'disbursed', label: 'Disbursed Amount', type: 'money', sum: true, decimals: 2 },
     { key: 'row_count', label: '#', type: 'number', computed: true, editable: false },
     //  live search field sample 
     // { key: 'permissions', label: 'Permissions',

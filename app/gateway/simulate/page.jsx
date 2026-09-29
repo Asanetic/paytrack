@@ -1,9 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import QuickPayFlow from '../QuickPayFlow';
 import AdminGateModal from './AdminGateModal';
 import { getApiRoutes } from '../../paytrack/AppRoutes/apiRoutesHandler';
+import { MosyCard, closeMosyCard } from '../../components/MosyCard';
+import DynamicModalProvider from '../../components/DynamicModalProvider';
 import logo from '../../img/logo/logo.png'; // outside public!
 
 const apiRoutes = getApiRoutes();
@@ -26,6 +28,10 @@ export default function SimulateGatewayPage() {
   const [gateOpen, setGateOpen] = useState(false);
   const [deviceSetup, setDeviceSetup] = useState(loadDeviceSetup);
 
+  useEffect(() => {
+    document.title = 'Quick Pay Terminal';
+  }, []);
+
   const context = deviceSetup && {
     merchant: deviceSetup.merchant?.title,
     branch: deviceSetup.branch?.title,
@@ -41,15 +47,39 @@ export default function SimulateGatewayPage() {
     setGateOpen(true); // straight back to the admin login component
   };
 
+  const promptMerchantRequired = () => {
+    MosyCard(
+      'Merchant Required',
+      <div className="qp-merchant-required">
+        <p>This terminal isn't set up with a merchant yet. An admin needs to sign in and register a merchant before you can take payments.</p>
+        <button
+          type="button"
+          className="qp-merchant-required-btn"
+          onClick={() => {
+            closeMosyCard();
+            setGateOpen(true);
+          }}
+        >
+          Admin Login
+        </button>
+      </div>
+    );
+  };
+
   return (
     <>
       <QuickPayFlow
-        brand={{ name: 'Pay track (Simulated)', logo: logo.src }}
+        brand={{ name: 'Pay track (Terminal)', logo: logo.src }}
         merchant={{ name: 'Asanetic Mart', location: 'Juja, Kiambu' }}
         onSettings={() => setGateOpen(true)}
         context={context}
         onLogout={context ? logout : undefined}
         onConfirm={async ({ amount, currency, method, details }) => {
+          if (!deviceSetup?.merchant?.id) {
+            promptMerchantRequired();
+            throw new Error('Merchant required — sign in as admin to set one up.');
+          }
+
           const res = await fetch(apiRoutes.gatewayipn.base, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -82,6 +112,7 @@ export default function SimulateGatewayPage() {
           }}
         />
       )}
+      <DynamicModalProvider />
     </>
   );
 }

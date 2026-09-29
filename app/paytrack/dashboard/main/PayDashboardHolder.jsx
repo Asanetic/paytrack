@@ -4,6 +4,8 @@ import PayDashboard from '../../../dash/PayDashboard';
 import MonthlyTrendChart from '../../../dash/MonthlyTrendChart';
 import { mosyGetData } from '../../../MosyUtils/hiveUtils';
 import { getApiRoutes } from '../../AppRoutes/apiRoutesHandler';
+import { MosyCard } from '../../../components/MosyCard';
+import { hiveRoutes } from '../../../appConfigs/hiveRoutes';
 
 const apiRoutes = getApiRoutes();
 
@@ -34,6 +36,26 @@ const todayStr = () => {
 };
 
 const EMPTY = { hero: { totalAmount: 0, totalCount: 0, daysWithActivity: 0, daysCashVerified: 0, daysMissingCash: 0, attentionCount: 0 }, methods: [], recent: [], attention: [], monthly: [] };
+
+// Cash has no gateway/IPN callback — the only way it gets captured is a
+// physical CDM/till deposit. Rather than send the user off to a manual
+// entry form, this tells them what to actually go do, for the specific
+// day that's missing it.
+function showCdmWaitModal(day) {
+  const dateLabel = day
+    ? new Date(day).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    : 'Today';
+
+  MosyCard(
+    'Waiting for CDM transaction',
+    <div className="pd-cdm">
+      <div className="pd-cdm-date">{dateLabel}</div>
+      <span className="pd-cdm-spinner" />
+      <p className="pd-cdm-text">Waiting for CDM update…</p>
+      <p className="pd-cdm-sub">Deposit cash on the CDM machine to capture cash transactions for this day.</p>
+    </div>
+  );
+}
 
 export default function PayDashboardHolder() {
   const [range, setRange] = useState({ start: todayStr(), end: todayStr() });
@@ -82,7 +104,7 @@ export default function PayDashboardHolder() {
         amount: fmtMoney(hero.totalAmount),
         attentionCount: hero.daysMissingCash,
         attentionLabel: hero.daysMissingCash === 1 ? 'day missing cash' : 'days missing cash',
-        onViewIssues: go('/paytrack/payments/profile'),
+        onViewIssues: () => showCdmWaitModal(attention.find((a) => a.type === 'missing_cash')?.day),
         viewIssuesLabel: 'Log cash',
       }}
       methods={methods.map((m) => ({
@@ -94,7 +116,7 @@ export default function PayDashboardHolder() {
       }))}
       recent={{
         title: 'Recent payments',
-        onViewAll: go('/paytrack/payments/list'),
+        onViewAll: go(`${hiveRoutes.paytrack}/moneyflow/list`),
         emptyText: 'No payments yet in this range.',
         items: recent.map((r) => ({
           key: r.record_id,
@@ -108,7 +130,7 @@ export default function PayDashboardHolder() {
       }}
       attention={{
         title: 'Needs your attention',
-        onViewAll: go('/paytrack/payments/profile'),
+        onViewAll: go(`${hiveRoutes.paytrack}/moneyflow/list`),
         emptyText: 'All clear — nothing needs attention.',
         items: attention.map((a) => ({
           key: a.record_id,
@@ -120,7 +142,7 @@ export default function PayDashboardHolder() {
           tone: a.type === 'missing_cash' ? 'red' : (a.severity === 'high' ? 'red' : a.severity === 'low' ? 'gray' : 'amber'),
           amount: fmtMoney(a.amount),
           time: a.type === 'missing_cash' ? new Date(a.day).toLocaleDateString() : fmtAgo(a.at),
-          onClick: go('/paytrack/payments/profile'),
+          onClick: a.type === 'missing_cash' ? () => showCdmWaitModal(a.day) : go('/paytrack/payments/profile'),
         })),
       }}
     >

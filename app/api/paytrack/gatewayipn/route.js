@@ -269,6 +269,7 @@ export async function POST(request) {
         updated_at: "?",
         hive_site_id: "?",
         hive_site_name: "?",
+        event_remark: "?",
       },
       {
         record_id: magicRandomStr(7),
@@ -290,6 +291,7 @@ export async function POST(request) {
         updated_at: trx_time_stamp,
         hive_site_id,
         hive_site_name,
+        event_remark: "Terminal-Payment",
       }
     );
 

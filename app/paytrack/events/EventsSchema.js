@@ -79,11 +79,19 @@ export const EventsSchema = {
   profileActions: [
     { key: 'back', label: 'Back to list', icon: 'arrow-left', variant: 'outline-secondary', navigateTo: '/paytrack/events/list', grid: false, form: true },
     { key: 'save', label: 'Save', icon: 'save', variant: 'primary', grid: false, form: true, rowAction: false },
-    { key: 'delete', label: 'Delete', icon: 'trash', variant: 'outline-danger', confirm: 'Are you sure you want to delete this event?', editOnly: true, grid: false, form: true, rowAction: true, role: 'manage_events' },
-    { key: 'view', label: 'View more', icon: 'edit', rowAction: true },
-    { key: 'new', label: 'New Event', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/events/profile', grid: true, form: false, rowAction: false },
+    { key: 'delete', label: 'Delete', icon: 'trash', variant: 'outline-danger', confirm: 'Are you sure you want to delete this event?', editOnly: true, grid: false, form: false, rowAction: false, role: 'manage_events' },
+    { key: 'view', label: 'View more', icon: 'edit', rowAction: false },
+    { key: 'new', label: 'New Event', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/events/profile', grid: false, form: false, rowAction: false },
     { key: 'clone', label: 'Clone Record', icon: 'copy', variant: 'outline-secondary', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_events' },
-    //{ key: 'filterByDate', label: 'Filter by date', icon: 'calendar', variant: 'outline-primary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_branch', label: 'Filter by branch', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_type', label: 'Filter by type', icon: 'tag', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_mode', label: 'Filter by mode', icon: 'credit-card', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_remark', label: 'Filter by remark', icon: 'comment-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_date', label: 'Filter by date', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_today', label: 'Today', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_yesterday', label: 'Yesterday', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_this_week', label: 'This week', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_this_month', label: 'This month', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
   ],
 
 
@@ -101,7 +109,7 @@ export const EventsSchema = {
 
   fieldGroups: [],
   // Field keys shown as columns in list view, in display order.
-  showInList: ['row_count', 'branch_name', 'integration_name', 'event_id', 'event_type', 'external_ref', 'amount', 'currency'],
+  showInList: ['row_count', 'occurred_at', 'branch_name',  'event_id', 'event_type', 'amount', 'payment_mode' , 'external_ref', 'event_remark', 'currency'],
 
   //export columns these columns are used to generate upload csv template file
   exportColumns: ['branch_id', 'integration_id', 'event_id', 'event_type', 'external_ref', 'amount', 'currency'],
@@ -120,11 +128,11 @@ export const EventsSchema = {
     { key: 'event_id', label: 'Event Id', type: 'text' },
     { key: 'event_type', label: 'Event Type', type: 'text' },
     { key: 'external_ref', label: 'External Ref', type: 'text' },
-    { key: 'amount', label: 'Amount', type: 'money' },
+    { key: 'amount', label: 'Amount', type: 'money' , sum: true, decimals: 2},
     { key: 'currency', label: 'Currency', type: 'text' },
     { key: 'payment_mode', label: 'Payment Mode', type: 'text' },
     ...resolveField('client_id', { as: 'client_name' }),
-    { key: 'occurred_at', label: 'Occurred At', type: 'datetime' },
+    { key: 'occurred_at', label: 'Record Date', type: 'datetime' },
     { key: 'received_at', label: 'Received At', type: 'datetime' },
     { key: 'status', label: 'Status', type: 'groupedSelect', endpoint: moduleApi, groupByField: 'status' },
     { key: 'metadata', label: 'Metadata', type: 'textarea' },

@@ -239,5 +239,29 @@ export function FieldGroup({ group, values, setValue }) {
 // of alignment. It's a plain flex row now, positioned purely by this
 // stylesheet.
 export const formLayoutStyles = `
-  
+    .dyn-password-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .dyn-password-wrap .dyn-input {
+    width: 100%;
+    padding-right: 2.25rem; /* room for the toggle so it never overlaps typed text */
+  }
+  .dyn-password-toggle {
+    position: absolute;
+    right: 0.6rem;
+    background: none;
+    border: none;
+    padding: 0;
+    color: #9aa0a6;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .dyn-password-toggle:hover {
+    color: #555;
+  }
+  .dyn-password-static {
+    letter-spacing: 0.2rem; /* masking dots readable but clearly not real characters */
+  }
 `;

@@ -9,6 +9,8 @@
 // `fields` array in sync between the two by regenerating both together
 // (this tool writes both from the same column read).
 
+import { resolveJoin } from '../../paytrackSchema';
+
 export const SystemusersSchema = {
   entity: 'system_users',
 
@@ -25,30 +27,28 @@ export const SystemusersSchema = {
     { key: 'ref_id', type: 'text', searchable: true },
     { key: 'regdate', type: 'datetime' },
     { key: 'user_no', type: 'text', searchable: true },
-    { key: 'user_pic', type: 'image', searchable: true },
+    { key: 'user_pic', type: 'text', searchable: true },
     { key: 'user_gender', type: 'text', searchable: true },
     { key: 'last_seen', type: 'text', searchable: true },
     { key: 'about', type: 'textarea', searchable: true },
     { key: 'hive_site_id', type: 'text', searchable: true },
     { key: 'hive_site_name', type: 'text', title: true, required: true, searchable: true },
     { key: 'project_id', type: 'text', searchable: true },
-    { key: 'project_name', type: 'text', title: true, required: true, searchable: true },
+    { key: 'login_password', type: 'text', title: true, required: true, searchable: true },
     { key: 'user_role', type: 'text', searchable: true },
     { key: 'account_status', type: 'text', searchable: true },
     { key: 'company_id', type: 'text', searchable: true },
     { key: 'company_name', type: 'text', title: true, required: true, searchable: true },
     { key: 'clusters', type: 'textarea', searchable: true },
     { key: 'regions', type: 'textarea', searchable: true },
+    { key: 'payment_account', type: 'text', searchable: true },
     { key: 'row_count', type: 'number', computed: true, editable: false },
   ],
 
   // Optional: joins enriching each row with data from another table.
   // Same shape as your existing *BatchMutations.js files.
   batchMutations: {
-    // "_staff_full_name_staff_id": {
-    //   type: "join", table: "staff", link: "staff_id:record_id",
-    //   select: { "_staff_full_name_staff_id": "full_name" }
-    // },
+    ...resolveJoin('user_role', { as: 'role_name' }),
   },
 
   roles: { view: 'view_systemusers', manage: 'manage_systemusers' },

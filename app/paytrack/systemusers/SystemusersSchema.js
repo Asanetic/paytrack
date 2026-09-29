@@ -10,6 +10,7 @@
 // entity/fields/batchMutations/roles.
 
 import { getApiRoutes } from '../AppRoutes/apiRoutesHandler';
+import { resolveField } from '../DataControl/paytrackSchema';
 // Use default base root (/)
 const apiRoutes = getApiRoutes();
 const moduleApi = apiRoutes.systemusers.base;
@@ -76,11 +77,11 @@ export const SystemusersSchema = {
   //},
 
   profileActions: [
-    { key: 'back', label: 'Back to list', icon: 'arrow-left', variant: 'outline-secondary', navigateTo: '/simukopa/systemusers/list', grid: false, form: true },
+    { key: 'back', label: 'Back to list', icon: 'arrow-left', variant: 'outline-secondary', navigateTo: '/paytrack/systemusers/list', grid: false, form: true },
     { key: 'save', label: 'Save', icon: 'save', variant: 'primary', grid: false, form: true, rowAction: false },
     { key: 'delete', label: 'Delete', icon: 'trash', variant: 'outline-danger', confirm: 'Are you sure you want to delete this systemuser?', editOnly: true, grid: false, form: true, rowAction: true, role: 'manage_systemusers' },
     { key: 'view', label: 'View more', icon: 'edit', rowAction: true },
-    { key: 'new', label: 'New user account', icon: 'user-plus', variant: 'outline-primary', navigateTo: '/simukopa/systemusers/profile', grid: true, form: false, rowAction: false },
+    { key: 'new', label: 'Add System user', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/systemusers/profile', grid: true, form: false, rowAction: false },
     { key: 'clone', label: 'Clone Record', icon: 'copy', variant: 'outline-secondary', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_systemusers' },
     //{ key: 'filterByDate', label: 'Filter by date', icon: 'calendar', variant: 'outline-primary', type: 'action', grid: true, form: false, rowAction: false },
   ],
@@ -100,14 +101,14 @@ export const SystemusersSchema = {
 
   fieldGroups: [],
   // Field keys shown as columns in list view, in display order.
-  showInList: ['row_count', 'user_pic', 'name', 'email', 'tel', 'ref_id', 'regdate', 'user_no'],
+  showInList: ['row_count', 'name', 'email', 'tel', 'ref_id', 'regdate', 'user_no', 'user_pic'],
 
   //export columns these columns are used to generate upload csv template file
   exportColumns: ['name', 'email', 'tel', 'ref_id', 'regdate', 'user_no', 'user_pic'],
 
   sections: [
-    { key: 'basic_information', label: 'Basic Information', columns: 3, fields: ['name', 'email', 'tel', 'ref_id', 'regdate', 'user_no', 'login_password'] },
-    { key: 'other_details', label: 'Other Details', columns: 3, fields: ['user_gender', 'last_seen', 'about', 'project_id', 'project_name', 'user_role', 'account_status', 'company_id', 'company_name', 'clusters', 'regions'] },
+    { key: 'basic_information', label: 'Basic Information', columns: 3, fields: ['user_pic','name', 'email', 'tel', 'login_password', 'regdate', 'user_no'] },
+    { key: 'other_details', label: 'Other Details', columns: 3, fields: ['user_gender', 'last_seen', 'about'] },
   ],
 
   fields: [
@@ -119,20 +120,20 @@ export const SystemusersSchema = {
     { key: 'tel', label: 'Tel', type: 'text' },
     { key: 'ref_id', label: 'Ref Id', type: 'text' },
     { key: 'regdate', label: 'Regdate', type: 'datetime' },
-    { key: 'login_password', label: 'Login Password', type: 'password' },
     { key: 'user_no', label: 'User No', type: 'text' },
-    { key: 'user_pic', label: 'User Pic', type: 'image' },
-    { key: 'user_gender', label: 'User Gender', type: 'text' },
-    { key: 'last_seen', label: 'Last Seen', type: 'text' },
-    { key: 'about', label: 'About', type: 'textarea' },
-    { key: 'project_id', label: 'Project Id', type: 'text' },
-    { key: 'project_name', label: 'Project Name', type: 'text', title: true, required: true },
-    { key: 'user_role', label: 'User Role', type: 'text' },
+    { key: 'user_pic', label: 'User Pic', type: 'image', colSpan: 12, imageClass:"useravatar_120" },
+    { key: 'user_gender', label: 'User Gender', type: 'select',options :['Male','Female', 'Other'] },
+    { key: 'last_seen', label: 'Last Seen', type: 'text', editable: false , editOnly: true},
+    { key: 'about', label: 'About', type: 'textarea', colSpan: 12 },
+    { key: 'login_password', label: 'Password', type: 'password' },
+    { key: 'project_name', label: 'Project Name', type: 'text' },
+    ...resolveField('user_role', { as: 'role_name' }),
     { key: 'account_status', label: 'Account Status', type: 'text' },
     { key: 'company_id', label: 'Company Id', type: 'text' },
-    { key: 'company_name', label: 'Company Name', type: 'text', title: true, required: true },
+    { key: 'company_name', label: 'Company Name', type: 'text' },
     { key: 'clusters', label: 'Clusters', type: 'textarea' },
     { key: 'regions', label: 'Regions', type: 'textarea' },
+    { key: 'payment_account', label: 'Payment Account', type: 'text' },
     { key: 'row_count', label: '#', type: 'number', computed: true, editable: false },
     //  live search field sample 
     // { key: 'permissions', label: 'Permissions',

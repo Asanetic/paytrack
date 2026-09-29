@@ -86,6 +86,10 @@ export const InMoneyflowSchema = {
     { key: 'filter_by_branch', label: 'Filter by branch', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_mode', label: 'Filter by mode', icon: 'credit-card', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_date', label: 'Filter by date', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_today', label: 'Today', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_yesterday', label: 'Yesterday', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_this_week', label: 'This week', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_this_month', label: 'This month', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
   ],
 
 

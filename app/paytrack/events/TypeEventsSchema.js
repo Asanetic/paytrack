@@ -10,7 +10,6 @@
 // entity/fields/batchMutations/roles.
 
 import { getApiRoutes } from '../AppRoutes/apiRoutesHandler';
-import { resolveField } from '../DataControl/paytrackSchema';
 // Use default base root (/)
 const apiRoutes = getApiRoutes();
 const moduleApi = apiRoutes.typeevents.base;
@@ -18,7 +17,7 @@ const moduleApi = apiRoutes.typeevents.base;
 export const TypeEventsSchema = {
   entity: 'business_events',              // DB table name; also drives default role names
                                      // (view_events / manage_events) and apiBase
-  label: 'Events',                 // optional, defaults to entity capitalized
+  label: 'Events By Type',                 // optional, defaults to entity capitalized
   apiBase: moduleApi,
 
   //api endpint for importing data from csv
@@ -79,12 +78,20 @@ export const TypeEventsSchema = {
   profileActions: [
     { key: 'back', label: 'Back to list', icon: 'arrow-left', variant: 'outline-secondary', navigateTo: '/paytrack/events/list', grid: false, form: true },
     { key: 'save', label: 'Save', icon: 'save', variant: 'primary', grid: false, form: true, rowAction: false },
-    { key: 'delete', label: 'Delete', icon: 'trash', variant: 'outline-danger', confirm: 'Are you sure you want to delete this event?', editOnly: true, grid: false, form: true, rowAction: true, role: 'manage_events' },
-    { key: 'view', label: 'View more', icon: 'edit', rowAction: true },
-    { key: 'new', label: 'New Event', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/events/profile', grid: true, form: false, rowAction: false },
+    { key: 'delete', label: 'Delete', icon: 'trash', variant: 'outline-danger', confirm: 'Are you sure you want to delete this event?', editOnly: true, grid: false, form: false, rowAction: false, role: 'manage_events' },
+    { key: 'view', label: 'View more', icon: 'edit', rowAction: false },
+    { key: 'new', label: 'New Event', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/events/profile', grid: false, form: false, rowAction: false },
     { key: 'clone', label: 'Clone Record', icon: 'copy', variant: 'outline-secondary', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_events' },
-    //{ key: 'filterByDate', label: 'Filter by date', icon: 'calendar', variant: 'outline-primary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_branch', label: 'Filter by branch', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_type', label: 'Filter by type', icon: 'tag', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_mode', label: 'Filter by mode', icon: 'credit-card', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_date', label: 'Filter by date', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_today', label: 'Today', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_yesterday', label: 'Yesterday', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_this_week', label: 'This week', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_this_month', label: 'This month', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
   ],
+
 
 
 
@@ -100,49 +107,30 @@ export const TypeEventsSchema = {
   ],
 
   fieldGroups: [],
-  // Field keys shown as columns in list view, in display order.
-  showInList: ['row_count', 'branch_name', 'integration_name', 'event_id', 'event_type', 'external_ref', 'amount', 'currency'],
+  // Rows here come from the dedicated /events/type aggregate endpoint
+  // (real SQL GROUP BY + SUM(amount)), NOT a per-record listing — every
+  // column is computed, not a real business_events DB column.
+  showInList: ['row_count', 'period', 'branch_name', 'event_type', 'total', 'count'],
 
   //export columns these columns are used to generate upload csv template file
-  exportColumns: ['branch_id', 'integration_id', 'event_id', 'event_type', 'external_ref', 'amount', 'currency'],
+  exportColumns: ['period', 'branch_name', 'event_type', 'total', 'count'],
 
   sections: [
-    { key: 'basic_information', label: 'Basic Information', columns: 3, fields: ['branch_id', 'integration_id', 'event_id', 'event_type', 'external_ref', 'amount', 'currency'] },
-    { key: 'other_details', label: 'Other Details', columns: 3, fields: ['payment_mode', 'client_id', 'occurred_at', 'received_at', 'status', 'metadata', 'raw_payload', 'event_remark'] },
+    { key: 'basic_information', label: 'Totals', columns: 3, fields: ['period', 'branch_name', 'event_type', 'total', 'count'] },
   ],
 
   fields: [
     // key: DB column name | label: shown on screen | type: drives input + SQL type
     { key: 'primkey', label: 'Primkey', type: 'number', system: true, editable: false },
     { key: 'record_id', label: 'Record Id', type: 'text', system: true, editable: false },
-    ...resolveField('branch_id', { as: 'branch_name' }),
-    ...resolveField('integration_id', { as: 'integration_name' }),
-    { key: 'event_id', label: 'Event Id', type: 'text' },
-    { key: 'event_type', label: 'Event Type', type: 'text' },
-    { key: 'external_ref', label: 'External Ref', type: 'text' },
-    { key: 'amount', label: 'Amount', type: 'money' },
-    { key: 'currency', label: 'Currency', type: 'text' },
-    { key: 'payment_mode', label: 'Payment Mode', type: 'text' },
-    ...resolveField('client_id', { as: 'client_name' }),
-    { key: 'occurred_at', label: 'Occurred At', type: 'datetime' },
-    { key: 'received_at', label: 'Received At', type: 'datetime' },
-    { key: 'status', label: 'Status', type: 'groupedSelect', endpoint: moduleApi, groupByField: 'status' },
-    { key: 'metadata', label: 'Metadata', type: 'textarea' },
-    { key: 'raw_payload', label: 'Raw Payload', type: 'textarea' },
-    { key: 'event_remark', label: 'Event Remark', type: 'textarea', colSpan: 3 },
+    { key: 'period', label: 'Date', type: 'text', computed: true, editable: false, title: true },
+    { key: 'branch_name', label: 'Branch', type: 'text', computed: true, editable: false },
+    { key: 'event_type', label: 'Event Type', type: 'text', computed: true, editable: false },
+    { key: 'total', label: 'Total', type: 'money', computed: true, editable: false, sum: true, decimals: 2 },
+    { key: 'count', label: 'Count', type: 'number', computed: true, editable: false, sum: true },
     { key: 'row_count', label: '#', type: 'number', computed: true, editable: false },
-    //  live search field sample 
-    // { key: 'permissions', label: 'Permissions',
-    //   type: 'liveSearch', colSpan: 6,
-    //   endpoint: '/api/assetguard/systemmodules',
-    //   searchTable: 'system_modules',
-    //   valueField: 'record_id',      // id column on system_modules
-    //   displayField: 'module_name',  // label column on system_modules — what search results/defaultValue text actually render
-    //   labelKey: 'permission_name',  // cached label already joined onto THIS row (system_roles) — only used to seed defaultValue on load
-    // },
-    // more fields... see SCHEMA-SPEC.md for the full field option list
-    // (searchable, editable, options, priority, db overrides)
   ],
+
 
   filters: [
     { key: 'all', label: 'All', query: {} },

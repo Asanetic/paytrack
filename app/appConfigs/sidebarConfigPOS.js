@@ -320,37 +320,37 @@ export const sidebarConfig = [
 
       {
         label: "Daily Report",
-        href: (routes) => `${routes.paytrack}/reports/daily`,
+        href: (routes) => `${routes.paytrack}/moneyflow/daily`,
         roles: []
       },
 
-      {
-        label: "Monthly Report",
-        href: (routes) => `${routes.paytrack}/reports/monthly`,
-        roles: []
-      },
+      // {
+      //   label: "Monthly Report",
+      //   href: (routes) => `${routes.paytrack}/reports/monthly`,
+      //   roles: []
+      // },
 
       {
         label: "By Payment Channel",
-        href: (routes) => `${routes.paytrack}/reports/bymethod`,
+        href: (routes) => `${routes.paytrack}/moneyflow/bymethod`,
         roles: []
       },
 
       {
         label: "By Branch",
-        href: (routes) => `${routes.paytrack}/reports/bybranch`,
+        href: (routes) => `${routes.paytrack}/moneyflow/bybranch`,
         roles: []
       },
 
       {
         label: "Business Events",
-        href: (routes) => `${routes.paytrack}/reports/events`,
+        href: (routes) => `${routes.paytrack}/events/list`,
         roles: []
       },
 
       {
         label: "Transaction Report",
-        href: (routes) => `${routes.paytrack}/reports/transactions`,
+        href: (routes) => `${routes.paytrack}/payments/list`,
         roles: []
       },
 
@@ -456,7 +456,7 @@ export const sidebarConfig = [
 
       {
         label: "Users",
-        href: (routes) => `${routes.paytrack}/users/list`,
+        href: (routes) => `${routes.paytrack}/systemusers/list`,
         roles: []
       },
 

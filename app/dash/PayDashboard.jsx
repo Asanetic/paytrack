@@ -66,7 +66,6 @@ const DATE_PRESETS = [
   { key: 'yesterday', label: 'Yesterday' },
   { key: 'week', label: 'This week' },
   { key: 'month', label: 'This month' },
-  { key: 'custom', label: 'Custom' },
 ];
 
 // Local YYYY-MM-DD — NOT toISOString(), which converts through UTC and
@@ -90,12 +89,15 @@ function presetRange(preset) {
   return { from: iso(today), to: iso(today) };
 }
 
-function DateRangeField({ value, onChange }) {
+// Presets auto-apply immediately on click. Start/End stay visible at all
+// times (there's no separate "Custom" mode); editing either one just
+// waits for the Apply button next to them (typing shouldn't refetch on
+// every keystroke). Everything sits on one line, inline labels only
+// (no stacked label-above-input) so nothing is offset from the buttons.
+function DateRangeField({ value, onChange, onApplyClick }) {
   const preset = value?.preset || 'today';
 
-  const pick = (key) => onChange(key === 'custom'
-    ? { preset: key, from: value?.from, to: value?.to }
-    : { preset: key, ...presetRange(key) });
+  const pick = (key) => onChange({ preset: key, ...presetRange(key) }, true);
 
   return (
     <div className="pd-daterange">
@@ -109,24 +111,28 @@ function DateRangeField({ value, onChange }) {
           {p.label}
         </button>
       ))}
-      {preset === 'custom' && (
-        <>
-          <input
-            type="date"
-            className="pd-select pd-custom-date"
-            value={value?.from || ''}
-            onChange={(e) => onChange({ preset: 'custom', from: e.target.value, to: value?.to })}
-          />
-          <span className="pd-custom-range-sep">to</span>
-          <input
-            type="date"
-            className="pd-select pd-custom-date"
-            value={value?.to || ''}
-            min={value?.from || undefined}
-            onChange={(e) => onChange({ preset: 'custom', from: value?.from, to: e.target.value })}
-          />
-        </>
-      )}
+      <label className="pd-daterange-field pt-2">
+        <span className="pd-daterange-field-label">Start</span>
+        <input
+          type="date"
+          className="pd-select pd-custom-date"
+          value={value?.from || ''}
+          onChange={(e) => onChange({ preset: 'custom', from: e.target.value, to: value?.to }, false)}
+        />
+      </label>
+      <label className="pd-daterange-field pt-2">
+        <span className="pd-daterange-field-label">End</span>
+        <input
+          type="date"
+          className="pd-select pd-custom-date"
+          value={value?.to || ''}
+          min={value?.from || undefined}
+          onChange={(e) => onChange({ preset: 'custom', from: value?.from, to: e.target.value }, false)}
+        />
+      </label>
+      <button type="button" className="pd-btn pd-btn-solid pd-daterange-apply" onClick={onApplyClick}>
+        Apply
+      </button>
     </div>
   );
 }
@@ -141,11 +147,17 @@ function FilterBar({ filters, onApply }) {
   );
   if (!filters || filters.length === 0) return null;
 
-  const set = (key, val) => {
-    setValues((v) => ({ ...v, [key]: val }));
+  // autoApply: presets fire immediately; typing a custom date just
+  // updates local state until the field's own Apply button is clicked.
+  const set = (key, val, autoApply = false) => {
+    const next = { ...values, [key]: val };
+    setValues(next);
     const f = filters.find((x) => x.key === key);
     f?.onChange?.(val);
+    if (autoApply) onApply?.(next);
   };
+
+  const hasNonDateFilter = filters.some((f) => f.type !== 'date');
 
   return (
     <div className="pd-card pd-filterbar">
@@ -158,7 +170,11 @@ function FilterBar({ filters, onApply }) {
           <label key={f.key} className={`pd-filter ${f.type === 'date' ? 'pd-filter-date' : ''}`}>
             <span className="pd-filter-caption">{f.label}</span>
             {f.type === 'date' ? (
-              <DateRangeField value={values[f.key]} onChange={(val) => set(f.key, val)} />
+              <DateRangeField
+                value={values[f.key]}
+                onChange={(val, autoApply) => set(f.key, val, autoApply)}
+                onApplyClick={() => onApply?.(values)}
+              />
             ) : (
               <span className="pd-select-wrap">
                 {f.icon && <i className={`fa fa-${f.icon} pd-select-icon`}></i>}
@@ -172,8 +188,8 @@ function FilterBar({ filters, onApply }) {
           </label>
         ))}
       </div>
-      {onApply && (
-        <button type="button" className="pd-btn pd-btn-solid" onClick={() => onApply(values)}>
+      {onApply && hasNonDateFilter && (
+        <button type="button" className="pd-btn pd-btn-solid pt-2" onClick={() => onApply(values)}>
           Apply
         </button>
       )}
@@ -283,7 +299,10 @@ function MethodCards({ methods }) {
             onClick={m.onClick}
           >
             <div className="pd-method-top">
-              <IconBubble icon={m.icon || 'money'} tone={m.tone || 'blue'} size="lg" />
+              <div className="pd-method-head">
+                <IconBubble icon={m.icon || 'money'} tone={m.tone || 'blue'} size="lg" />
+                <div className="pd-method-name">{m.label}</div>
+              </div>
               {m.matchedPercent !== undefined && (
                 <div className={`pd-method-badge pd-soft-${m.tone || 'blue'}`}>
                   <strong>{m.matchedPercent}%</strong>
@@ -291,7 +310,6 @@ function MethodCards({ methods }) {
                 </div>
               )}
             </div>
-            <div className="pd-method-name">{m.label}</div>
             <div className="pd-method-amount">{m.amount}</div>
             {m.count !== undefined && (
               <div className="pd-muted">

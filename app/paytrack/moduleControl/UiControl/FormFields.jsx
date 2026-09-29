@@ -37,6 +37,51 @@ export function TextInput({ field, value, setValue, readOnly }) {
   );
 }
 
+// Deliberately its own component rather than another TextInput branch —
+// unlike number/email/tel, a password needs local UI state (the
+// show/hide toggle) and different read-only behavior. Read-only never
+// echoes the real value back into the DOM as plaintext (a saved hash or
+// a value pulled from `row` has no business being visible/inspectable) —
+// it shows fixed masking dots instead, same spirit as DateInput's
+// locked-field treatment but without leaking the underlying value.
+export function PasswordInput({ field, value, setValue, readOnly }) {
+  const [visible, setVisible] = useState(false);
+
+  if (readOnly) {
+    return <div className="dyn-input dyn-input-static dyn-password-static">••••••••</div>;
+  }
+
+  return (
+    <div className="dyn-password-wrap">
+      <input
+        type={visible ? 'text' : 'password'}
+        className="dyn-input"
+        placeholder={field.placeholder || `Enter ${field.label?.toLowerCase() || ''}`}
+        value={value ?? ''}
+        // 'new-password' (not 'current-password') is the safer default —
+        // it stops browsers from silently offering to autofill an
+        // existing saved login password into what's usually a create/set
+        // field. Schemas for an actual login form should pass
+        // field.autoComplete: 'current-password' explicitly.
+        autoComplete={field.autoComplete || 'new-password'}
+        onChange={(e) => setValue(field.key, e.target.value)}
+      />
+      <button
+        type="button"
+        className="dyn-password-toggle"
+        onClick={() => setVisible((v) => !v)}
+        // Keyboard users tab through form fields, not decoration —
+        // this button only exists for mouse/touch convenience.
+        tabIndex={-1}
+        aria-label={visible ? 'Hide password' : 'Show password'}
+      >
+        <i className={`fa ${visible ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+      </button>
+    </div>
+  );
+}
+
+
 export function TextareaInput({ field, value, setValue, readOnly }) {
   return (
     <textarea
@@ -270,6 +315,7 @@ export function ImageInput({ field, value, setValue, readOnly, schema }) {
 
 export const FIELD_COMPONENTS = {
   text: TextInput, tel: TextInput, email: TextInput, number: TextInput, money: TextInput,
+  password: PasswordInput,
   date: DateInput,
   datetime: DateTimeInput,
   textarea: TextareaInput,
