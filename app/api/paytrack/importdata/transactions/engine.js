@@ -58,6 +58,8 @@ function cleanRow(raw, line) {
     payer_phone: str(r.payer_phone),
     reference: str(r.reference),
     expected_amount: str(r.expected_amount) === "" ? null : num(r.expected_amount),
+    in_rate: str(r.rate) === "" ? null : num(r.rate),          // optional, from sheet (%)
+    in_charges: str(r.charges) === "" ? null : num(r.charges), // optional, from sheet (actual amount)
     status: (str(r.status) || "completed").toLowerCase(),
     errors: [],
     flags: [],
@@ -71,6 +73,9 @@ function cleanRow(raw, line) {
   if (row.amount === null) row.errors.push("amount must be a number");
   else if (row.amount < 0) row.errors.push("amount cannot be negative");
   if (str(r.expected_amount) !== "" && row.expected_amount === null) row.errors.push("expected_amount must be a number");
+  if (str(r.rate) !== "" && (row.in_rate === null || row.in_rate < 0 || row.in_rate > 100)) row.errors.push("rate must be a percentage between 0 and 100");
+  if (str(r.charges) !== "" && (row.in_charges === null || row.in_charges < 0)) row.errors.push("charges must be a number, 0 or more");
+  else if (row.in_charges !== null && row.amount !== null && row.in_charges > row.amount) row.errors.push("charges cannot be more than the amount");
   return row;
 }
 
@@ -114,8 +119,21 @@ async function classify(conn, rawRows, hive) {
     r.state = "valid";
 
     if (r.direction === "in") {
-      r.rate = resolveRate(channels.get(r.branch.toLowerCase()), r.payment_mode);
-      r.charge = round2(r.amount * (r.rate / 100));
+      // Precedence: actual charges > rate from sheet > channel rate.
+      // Give only one and the other is computed; give both and both are kept as entered.
+      if (r.in_charges !== null) {
+        r.charge = round2(r.in_charges);
+        r.rate = r.in_rate !== null ? r.in_rate : r.amount > 0 ? Math.round((r.charge / r.amount) * 1e6) / 1e4 : 0;
+        r.rate_source = r.in_rate !== null ? "sheet" : "sheet (rate from charges)";
+      } else if (r.in_rate !== null) {
+        r.rate = r.in_rate;
+        r.charge = round2(r.amount * (r.rate / 100));
+        r.rate_source = "sheet (charges from rate)";
+      } else {
+        r.rate = resolveRate(channels.get(r.branch.toLowerCase()), r.payment_mode);
+        r.charge = round2(r.amount * (r.rate / 100));
+        r.rate_source = "channel";
+      }
       r.disbursed = round2(r.amount - r.charge);
     }
 
@@ -178,7 +196,7 @@ function analyse(rows) {
 const slim = (r) => ({
   line: r.line, direction: r.direction, transaction_id: r.transaction_id, transaction_at: r.transaction_at, branch: r.branch,
   payment_mode: r.payment_mode, amount: r.amount, payer_name: r.payer_name, reference: r.reference,
-  expected_amount: r.expected_amount, rate: r.rate ?? null, charge: r.charge ?? null, disbursed: r.disbursed ?? null, state: r.state, flags: r.flags, errors: r.errors,
+  expected_amount: r.expected_amount, rate: r.rate ?? null, rate_source: r.rate_source ?? null, charge: r.charge ?? null, disbursed: r.disbursed ?? null, state: r.state, flags: r.flags, errors: r.errors,
 });
 
 /* ---------- public API ---------- */
