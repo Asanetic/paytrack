@@ -10,15 +10,16 @@ const MAX_BYTES = 10 * 1024 * 1024;
 // Original column order, with the money columns grouped in the acquirer statement's order
 // (Gross, Fee %, Fee, Net). Optional statement details sit at the end.
 // The statement's own header names are also accepted, so an exported statement can be uploaded as-is.
-const HEADERS = ["type", "transaction_id", "transaction_date", "channel", "payment_mode", "amount", "rate", "charges", "settled_amount", "currency", "payer_name", "payer_phone", "reference", "expected_amount", "status", "settlement_date", "card_scheme", "origin", "description", "batch"];
+const HEADERS = ["type", "transaction_id", "transaction_date", "channel", "payment_mode", "amount", "rate", "charges", "settled_amount", "currency", "payer_name", "payer_phone", "reference", "expected_amount", "status", "settlement_date", "card_scheme", "origin", "description", "batch", "category", "balance"];
 const sampleRows = (ch) => [
   // full statement row: gross, fee %, fee and net all present
-  ["money_in", "SC-HOT-0002", "2026-11-04", ch, "card", 8500, 2.5, 212.5, 8287.5, "KES", "", "", "GUEST-1062", "", "completed", "2026-11-05", "Visa", "International", "Restaurant and bar", "BATCH-261104-01"],
+  ["money_in", "SC-HOT-0002", "2026-11-04", ch, "card", 8500, 2.5, 212.5, 8287.5, "KES", "", "", "GUEST-1062", "", "completed", "2026-11-05", "Visa", "International", "Restaurant and bar", "BATCH-261104-01", "", ""],
   // only the net settlement is known: fee and rate are worked out (437.50 = 3.5%)
-  ["money_in", "SC-HOT-0003", "2026-11-07", ch, "card", 12500, "", "", 12062.5, "KES", "", "", "GUEST-1093", "", "completed", "2026-11-08", "Mastercard", "Domestic", "Conference booking", "BATCH-261107-01"],
+  ["money_in", "SC-HOT-0003", "2026-11-07", ch, "card", 12500, "", "", 12062.5, "KES", "", "", "GUEST-1093", "", "completed", "2026-11-08", "Mastercard", "Domestic", "Conference booking", "BATCH-261107-01", "", ""],
   // no fee info at all: the channel's configured rate is used
-  ["money_in", "MP-0001", "2026-11-08", ch, "mpesa", 5000, "", "", "", "KES", "Jane Wanjiku", "0711000001", "INV-2001", 5000, "completed", "", "", "", "Walk-in payment", ""],
-  ["money_out", "OUT-5001", "2026-11-09", ch, "bank", 3000, "", "", "", "KES", "Office Supplies Ltd", "0733000009", "PO-221", "", "completed", "", "", "", "Supplier payment", ""],
+  ["money_in", "MP-0001", "2026-11-08", ch, "mpesa", 5000, "", "", "", "KES", "Jane Wanjiku", "0711000001", "INV-2001", 5000, "completed", "", "", "", "Walk-in payment", "", "", 1250000],
+  // money out: category groups it in the Owners Report; charges = the fee paid to move it
+  ["money_out", "OUT-5001", "2026-11-09", ch, "mpesa", 3000, "", 33, "", "KES", "Office Supplies Ltd", "0733000009", "PO-221", "", "completed", "", "", "", "Supplier payment", "", "Supplier payments", 1247000],
 ];
 const SAMPLE = sampleRows("Savannah Crown");
 const GUIDE = [
@@ -38,6 +39,9 @@ const GUIDE = [
   ["expected_amount", "No", "Difference of 1 or more is flagged as underpaid / overpaid"],
   ["status", "No", "Default completed"],
   ["settlement_date / card_scheme / origin / description / batch", "No", "Statement 'Settlement Date', 'Card', 'Origin', 'Description', 'Batch'. Kept on the transaction"],
+  ["category", "No", "Money out only: what kind of payment it was (Supplier payments, Payments to mobile numbers, Transfers to bank, Paybill payments, Cash withdrawals through agents). Groups the Owners Report"],
+  ["balance", "No", "Running balance shown on the statement after this row. The latest one is used as the account balance in the Owners Report"],
+  ["(M-PESA layout)", "No", "A statement with separate 'Paid in' and 'Withdrawn' columns also works: a row with only Withdrawn is money out, and 'Fee' is kept as that payment's charge"],
 ];
 
 const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });

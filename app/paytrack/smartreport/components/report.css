@@ -1,0 +1,78 @@
+/* Owners Report: on screen each page is an A4 sheet; when printed, one sheet = one PDF page. */
+.or-wrap { --g: #1a7f4b; --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; padding: 16px; color: var(--ink); }
+.or-pagetitle { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
+.or-pagesub { color: var(--muted); margin-bottom: 14px; }
+.or-hint { color: var(--muted); padding: 24px 0; }
+
+.or-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+.or-controls label { display: flex; flex-direction: column; gap: 4px; margin: 0; font-size: .78rem; color: #4b5563; }
+.or-controls input[type=text], .or-controls input[type=date], .or-controls select { border: 1px solid #d1d5db; border-radius: 8px; padding: 7px 10px; font-size: .88rem; background: #fff; color: var(--ink); }
+.or-controls .or-grow { flex: 1; min-width: 200px; }
+.or-controls .or-check { flex-direction: row; align-items: center; gap: 6px; padding-bottom: 8px; }
+.or-actions { display: flex; gap: 8px; margin-left: auto; }
+.or-btn { border: 1px solid #d1d5db; background: #fff; color: var(--ink); border-radius: 8px; padding: 8px 14px; font-weight: 600; font-size: .88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.or-btn:hover:not(:disabled) { background: #f9fafb; } .or-btn:disabled { opacity: .5; cursor: not-allowed; }
+.or-btn.primary { background: var(--g); border-color: var(--g); color: #fff; } .or-btn.primary:hover:not(:disabled) { background: #146339; }
+.or-alert { background: #fdecee; border: 1px solid #f5c2c7; color: #7f1d1d; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: .9rem; }
+.or-alert.warn { background: #fff7e6; border-color: #fde1a6; color: #7a4b00; }
+
+/* ---- the report itself ---- */
+.or-report { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.or-page { position: relative; width: 210mm; min-height: 297mm; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.14); padding: 16mm 16mm 20mm; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.5; color: var(--ink); }
+.or-foot { position: absolute; left: 16mm; right: 16mm; bottom: 9mm; display: flex; justify-content: space-between; font-size: 7.5pt; color: var(--muted); border-top: 1px solid var(--line); padding-top: 4px; }
+
+.or-title { font-size: 22pt; font-weight: 800; letter-spacing: .02em; margin: 0 0 4px; color: #1d2026; }
+.or-sub { font-size: 11pt; font-weight: 700; margin-bottom: 8px; }
+.or-h1 { font-size: 13pt; font-weight: 800; letter-spacing: .02em; margin: 18px 0 6px; padding-bottom: 3px; border-bottom: 2px solid #c8961a; color: #1d2026; }
+.or-h2 { font-size: 11pt; font-weight: 700; margin: 14px 0 4px; color: #8a6410; }
+.or-p { margin: 0 0 8px; }
+
+.or-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 6px; }
+.or-card { border: 1px solid var(--line); border-left: 4px solid #c8961a; border-radius: 6px; padding: 10px 12px; background: #fbf7ec; }
+.or-card-l { font-size: 7.5pt; font-weight: 700; letter-spacing: .06em; color: var(--muted); }
+.or-card-v { font-size: 16pt; font-weight: 800; margin-top: 2px; }
+.or-callout { background: #fff7e6; border-left: 4px solid #d97706; border-radius: 4px; padding: 8px 12px; margin: 8px 0; font-weight: 600; font-size: 10pt; }
+
+.or-table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 10pt; }
+.or-table th { background: #f6efdc; text-align: left; font-weight: 700; padding: 6px 8px; border-bottom: 1px solid #e6d9b5; }
+.or-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.or-table .num { text-align: right; white-space: nowrap; }
+.or-table tr.or-total td { font-weight: 800; border-top: 2px solid var(--ink); border-bottom: 0; background: #fbf7ec; }
+.or-list { margin: 4px 0 8px 18px; padding: 0; } .or-list li { margin-bottom: 4px; }
+.or-tagline { margin-top: 22px; font-weight: 800; color: #8a6410; text-align: center; font-size: 11pt; }
+
+/* logo + charts */
+.or-logo { display: block; width: 62mm; height: auto; margin: 0 0 10px; }
+.or-split { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; align-items: start; }
+.or-chart { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 6px 0 10px; background: #fff; break-inside: avoid; }
+.or-chart-t { font-size: 8pt; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.or-donut { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.or-legend { list-style: none; margin: 0; padding: 0; width: 100%; font-size: 8.5pt; }
+.or-legend li { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.or-legend i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.or-legend span { flex: 1; } .or-legend b { font-weight: 700; }
+.or-bar { margin-bottom: 7px; } .or-bar-top { display: flex; justify-content: space-between; font-size: 9pt; margin-bottom: 2px; }
+.or-bar-track { height: 9px; background: #eef0f2; border-radius: 99px; overflow: hidden; } .or-bar-track i { display: block; height: 100%; border-radius: 99px; }
+@media (max-width: 900px) { .or-split { grid-template-columns: 1fr; } }
+
+/* ---- printing: only the report, one sheet per page, no app chrome ---- */
+@page { size: A4; margin: 0; }
+@media print {
+  /* The app shell offsets content for its sidebar (.page-wrapper margin-left: 240px, position: relative).
+     Drop that offset so the report starts at the very left of the paper. */
+  html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  .main-wrapper, .page-wrapper, .page-wrapper > .content, .or-wrap {
+    position: static !important; margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important;
+    transform: none !important; left: auto !important; top: auto !important;
+  }
+  .or-screen-only { display: none !important; }
+  body * { visibility: hidden !important; }
+  .or-report, .or-report * { visibility: visible !important; }
+  /* span the full paper width and centre each A4 sheet, so left and right margins stay equal on any paper size */
+  .or-report { position: absolute; left: 0; right: 0; top: 0; width: auto; display: block; }
+  .or-page { box-shadow: none; margin: 0 auto; page-break-after: always; break-after: page; height: 297mm; min-height: 0; overflow: hidden; }
+  .or-page:last-child { page-break-after: auto; break-after: auto; }
+  .or-table tr, .or-card, .or-callout { break-inside: avoid; }
+  .or-report, .or-report * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+@media (max-width: 900px) { .or-page { width: 100%; min-height: 0; padding: 14px 14px 52px; } .or-actions { margin-left: 0; } }

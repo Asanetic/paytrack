@@ -50,6 +50,9 @@
         "delete": "/api/paytrack/loanplans/list/delete",
         "import": "/api/paytrack/loanplans/import"
     },
+    "smartreport": {
+        "base": "/api/paytrack/smartreport"
+    },
     "payments": {
         "base": "/api/paytrack/payments/list",
         "delete": "/api/paytrack/payments/list/delete",

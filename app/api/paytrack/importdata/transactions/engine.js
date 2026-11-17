@@ -46,11 +46,12 @@ function cleanRow(raw, line, defaultChannel = "") {
   for (const k in raw) r[norm(k)] = raw[k];
 
   const dirRaw = str(r.type || r.transaction_type).toLowerCase().replace(/[\s-]+/g, "_");
-  const direction = dirRaw === "" || ["in", "money_in", "received"].includes(dirRaw) ? "in"
+  let direction = dirRaw === "" || ["in", "money_in", "received"].includes(dirRaw) ? "in"
     : ["out", "money_out", "paid", "paid_out"].includes(dirRaw) ? "out" : null;
 
   // Each field accepts our template header and the acquirer-statement header.
-  const gross = pick(r, "amount", "gross", "gross_kes", "gross_amount");
+  const gross = pick(r, "amount", "gross", "gross_kes", "gross_amount", "paid_in");
+  const withdrawn = pick(r, "withdrawn", "paid_out", "withdrawal"); // M-PESA style statements: separate Paid in / Withdrawn columns
   const ratePct = pick(r, "rate", "fee_pct", "fee_percent", "fee_rate", "rate_pct");
   const fee = pick(r, "charges", "fee", "fee_kes", "fee_amount");
   const net = pick(r, "settled_amount", "net", "net_kes", "net_amount", "settled");
@@ -64,6 +65,8 @@ function cleanRow(raw, line, defaultChannel = "") {
     origin: str(r.origin),
     description: str(r.description),
     batch: str(r.batch),
+    category: str(pick(r, "category", "payment_category")), // money out: Supplier payments, Paybill payments...
+    balance: num(pick(r, "balance", "running_balance")) ?? "", // running balance shown on the statement
   }).filter(([, v]) => v !== ""));
 
   const row = {
@@ -88,6 +91,14 @@ function cleanRow(raw, line, defaultChannel = "") {
     flags: [],
   };
 
+  // Paid in / Withdrawn layout: a row with only a Withdrawn value is money out.
+  if (dirRaw === "" && row.amount === null && str(gross) === "" && str(withdrawn) !== "") {
+    row.direction = "out";
+    row.amount = opt(withdrawn);
+  }
+  // Fees on money out can't be stored as rate/charges columns, so they travel with the event (the Owners Report sums them).
+  if (row.direction === "out" && row.in_charges !== null) row.extra.charges = row.in_charges;
+
   // Gap-filling: a statement row can be missing the gross. Rebuild it from the other figures.
   if (row.amount === null && str(gross) === "") {
     let a = null;
@@ -97,7 +108,7 @@ function cleanRow(raw, line, defaultChannel = "") {
     if (a !== null) { row.amount = round2(a); row.flags.push("amount_derived"); }
   }
 
-  if (!direction) row.errors.push("type must be money_in or money_out");
+  if (!row.direction) row.errors.push("type must be money_in or money_out");
   if (!row.transaction_id) row.errors.push("transaction_id is required");
   if (!row.transaction_at) row.errors.push("transaction_date missing or invalid (use YYYY-MM-DD HH:MM:SS)");
   if (!row.branch) row.errors.push("channel is required (add the column, or pick a channel for the file)");

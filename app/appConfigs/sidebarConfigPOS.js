@@ -325,6 +325,12 @@ export const sidebarConfig = [
     items: [
 
       {
+        label: "Owners Report",
+        href: (routes) => `${routes.paytrack}/smartreport`,
+        roles: []
+      },
+
+      {
         label: "Daily Report",
         href: (routes) => `${routes.paytrack}/moneyflow/daily`,
         roles: []
