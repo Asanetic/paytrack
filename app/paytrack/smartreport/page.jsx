@@ -10,8 +10,11 @@ export async function generateMetadata() {
   };
 }
 
-export default function Page() {
+export default function Page() 
+{
+
   return (
+  
     <div className="main-wrapper">
       <div className="page-wrapper">
         <div className="content container-fluid p-0 m-0">
