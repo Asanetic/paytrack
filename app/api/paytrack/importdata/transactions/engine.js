@@ -60,6 +60,7 @@ function cleanRow(raw, line) {
     expected_amount: str(r.expected_amount) === "" ? null : num(r.expected_amount),
     in_rate: str(r.rate) === "" ? null : num(r.rate),          // optional, from sheet (%)
     in_charges: str(r.charges) === "" ? null : num(r.charges), // optional, from sheet (actual amount)
+    in_settled: str(r.settled_amount) === "" ? null : num(r.settled_amount), // optional: what was paid out to the merchant
     status: (str(r.status) || "completed").toLowerCase(),
     errors: [],
     flags: [],
@@ -76,6 +77,11 @@ function cleanRow(raw, line) {
   if (str(r.rate) !== "" && (row.in_rate === null || row.in_rate < 0 || row.in_rate > 100)) row.errors.push("rate must be a percentage between 0 and 100");
   if (str(r.charges) !== "" && (row.in_charges === null || row.in_charges < 0)) row.errors.push("charges must be a number, 0 or more");
   else if (row.in_charges !== null && row.amount !== null && row.in_charges > row.amount) row.errors.push("charges cannot be more than the amount");
+  if (str(r.settled_amount) !== "" && (row.in_settled === null || row.in_settled < 0 || (row.amount !== null && row.in_settled > row.amount))) {
+    row.errors.push("settled_amount must be a number between 0 and the amount");
+  } else if (row.in_settled !== null && row.in_charges !== null && row.amount !== null && Math.abs(row.amount - row.in_charges - row.in_settled) > 0.01) {
+    row.errors.push("settled_amount + charges must equal amount (give just one of them, or make them add up)");
+  }
   return row;
 }
 
@@ -119,9 +125,14 @@ async function classify(conn, rawRows, hive) {
     r.state = "valid";
 
     if (r.direction === "in") {
-      // Precedence: actual charges > rate from sheet > channel rate.
-      // Give only one and the other is computed; give both and both are kept as entered.
-      if (r.in_charges !== null) {
+      // amount = what the client paid; settled = what the merchant received.
+      // Precedence: charges > settled_amount > rate > channel rate. Whatever is
+      // missing is computed; rate/charges given together are kept as entered.
+      if (r.in_charges === null && r.in_settled !== null) {
+        r.charge = round2(r.amount - r.in_settled);
+        r.rate = r.in_rate !== null ? r.in_rate : r.amount > 0 ? Math.round((r.charge / r.amount) * 1e6) / 1e4 : 0;
+        r.rate_source = r.in_rate !== null ? "sheet" : "sheet (from settled amount)";
+      } else if (r.in_charges !== null) {
         r.charge = round2(r.in_charges);
         r.rate = r.in_rate !== null ? r.in_rate : r.amount > 0 ? Math.round((r.charge / r.amount) * 1e6) / 1e4 : 0;
         r.rate_source = r.in_rate !== null ? "sheet" : "sheet (rate from charges)";

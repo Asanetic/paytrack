@@ -7,11 +7,12 @@ import { getApiRoutes } from "../AppRoutes/apiRoutesHandler";
 const endpoint = getApiRoutes().payments.importTransactions;
 const MAX_BYTES = 10 * 1024 * 1024;
 
-const HEADERS = ["type", "transaction_id", "transaction_date", "channel", "payment_mode", "amount", "currency", "payer_name", "payer_phone", "reference", "expected_amount", "rate", "charges", "status"];
+const HEADERS = ["type", "transaction_id", "transaction_date", "channel", "payment_mode", "amount", "currency", "payer_name", "payer_phone", "reference", "expected_amount", "rate", "charges", "settled_amount", "status"];
 const SAMPLE = [
-  ["money_in", "TX-9001", "2026-11-01 09:20:00", "Nairobi CBD", "mpesa", 5000, "KES", "Jane Wanjiku", "0711000001", "INV-1001", 5000, 1.5, "", "completed"],
-  ["money_in", "TX-9002", "2026-11-01 11:00:00", "Nairobi CBD", "bank", 11500, "KES", "Peter Otieno", "0722000002", "INV-1002", 12000, "", 150, "completed"],
-  ["money_out", "OUT-5001", "2026-11-02 15:00:00", "Nairobi CBD", "bank", 3000, "KES", "Office Supplies Ltd", "0733000009", "PO-221", 3000, "", "", "completed"],
+  ["money_in", "TX-9001", "2026-11-01 09:20:00", "Nairobi CBD", "mpesa", 5000, "KES", "Jane Wanjiku", "0711000001", "INV-1001", 5000, 1.5, "", "", "completed"],
+  ["money_in", "TX-9002", "2026-11-01 11:00:00", "Nairobi CBD", "bank", 11500, "KES", "Peter Otieno", "0722000002", "INV-1002", 12000, "", 150, "", "completed"],
+  ["money_in", "TX-9003", "2026-11-02 10:10:00", "Nairobi CBD", "mpesa", 3500, "KES", "Amina Hassan", "0733000003", "INV-1003", 3500, "", "", 3447.5, "completed"],
+  ["money_out", "OUT-5001", "2026-11-02 15:00:00", "Nairobi CBD", "bank", 3000, "KES", "Office Supplies Ltd", "0733000009", "PO-221", 3000, "", "", "", "completed"],
 ];
 const GUIDE = [
   ["Column", "Required", "Notes"],
@@ -20,13 +21,14 @@ const GUIDE = [
   ["transaction_date", "Yes", "YYYY-MM-DD HH:MM:SS"],
   ["channel", "Yes", "Channel name; created automatically if new"],
   ["payment_mode", "Yes", "mpesa / cash / card / bank"],
-  ["amount", "Yes", "Plain number"],
+  ["amount", "Yes", "What the client paid. Plain number"],
   ["currency", "No", "Default KES"],
   ["payer_name / payer_phone", "No", "Money in: client created/linked. Money out: payee name/phone"],
   ["reference", "No", "Invoice / receipt ref; same ref + amount twice = possible duplicate"],
   ["expected_amount", "No", "Difference is flagged as underpaid / overpaid"],
   ["rate", "No", "Charge % for this transaction. Charges are computed from it. Blank = channel rate"],
   ["charges", "No", "Actual charge amount. Wins over everything; the rate is computed from it. Fill both to keep both as entered"],
+  ["settled_amount", "No", "What was paid out to the merchant after charges. Charges = amount - settled. Don't fill it together with charges unless they add up"],
   ["status", "No", "Default completed"],
 ];
 
