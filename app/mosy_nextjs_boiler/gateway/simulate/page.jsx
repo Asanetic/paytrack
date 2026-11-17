@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import QuickPayFlow from '../QuickPayFlow';
 import AdminGateModal from './AdminGateModal';
-import { getApiRoutes } from '../../paytrack/AppRoutes/apiRoutesHandler';
+import { getApiRoutes } from '../../demo/AppRoutes/apiRoutesHandler';
 import { MosyCard, closeMosyCard } from '../../components/MosyCard';
 import DynamicModalProvider from '../../components/DynamicModalProvider';
 import logo from '../../img/logo/logo.png'; // outside public!

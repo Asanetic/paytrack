@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { hiveRoutes } from '../../appConfigs/hiveRoutes';
-import { getApiRoutes } from '../../paytrack/AppRoutes/apiRoutesHandler';
+import { getApiRoutes } from '../../demo/AppRoutes/apiRoutesHandler';
 import './AdminGateModal.css';
 
 const apiRoutes = getApiRoutes();
