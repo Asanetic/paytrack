@@ -7,12 +7,13 @@ const commonRoot = ""; // Update this path if needed
 
 const mosyThemeConfigs = {
   // App Identity
-  mosyAppName: "Paytrack",
-  mosySystemName: "paytrack",
+  mosyAppName: "Peltriva",
+  mosySystemName: "peltriva",
   mosyAppLogo: logo.src,
   mosyAppLogoStyle: {
     width: "auto",
     height: "70px",
+    maxWidth: "100%", // never wider than its container on small screens
   },
 
   // Color Scheme

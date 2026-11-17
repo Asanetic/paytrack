@@ -38,7 +38,8 @@ function MainLoginInputs({
   return (
     <div className="col-md-12 py-4">
       <div className="col-md-12 py-3 text-center">
-        <img src={appLogo} alt="App Logo" style={{ height: '100px' }} />
+        {/* scales with the screen: up to 280px wide on desktop, never wider than the card on a phone; height follows the logo's own proportions */}
+        <img src={appLogo} alt="App Logo" className="img-fluid" style={{ width: '100%', maxWidth: '280px', height: 'auto' }} />
       </div>
 
       <h4 className="col-md-12 mb-3 text-center d-none">{appName}</h4>
