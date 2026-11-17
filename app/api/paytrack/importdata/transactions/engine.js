@@ -96,16 +96,24 @@ function cleanRow(raw, line, defaultChannel = "") {
     row.direction = "out";
     row.amount = opt(withdrawn);
   }
-  // Fees on money out can't be stored as rate/charges columns, so they travel with the event (the Owners Report sums them).
-  if (row.direction === "out" && row.in_charges !== null) row.extra.charges = row.in_charges;
-
   // Gap-filling: a statement row can be missing the gross. Rebuild it from the other figures.
+  // Money in:  settled = amount - fee (what the business actually received).
+  // Money out: there is no settled amount; the fee is paid on top of the amount (total cost = amount + fee).
   if (row.amount === null && str(gross) === "") {
     let a = null;
-    if (row.in_charges !== null && row.in_settled !== null) a = row.in_charges + row.in_settled;
+    if (row.direction === "out") {
+      if (row.in_charges !== null && row.in_rate) a = (row.in_charges * 100) / row.in_rate;
+    } else if (row.in_charges !== null && row.in_settled !== null) a = row.in_charges + row.in_settled;
     else if (row.in_charges !== null && row.in_rate) a = (row.in_charges * 100) / row.in_rate;
     else if (row.in_settled !== null && row.in_rate !== null && row.in_rate < 100) a = row.in_settled / (1 - row.in_rate / 100);
     if (a !== null) { row.amount = round2(a); row.flags.push("amount_derived"); }
+  }
+
+  // Money out fee: a value, a percentage, or both; if both are given the value is kept as entered.
+  // Neither given = 0. It travels with the event (the Owners Report sums it). settled_amount is ignored.
+  if (row.direction === "out" && row.amount !== null) {
+    const fee = row.in_charges !== null ? row.in_charges : row.in_rate !== null ? row.amount * (row.in_rate / 100) : 0;
+    row.extra.charges = round2(fee);
   }
 
   if (!row.direction) row.errors.push("type must be money_in or money_out");
@@ -119,8 +127,11 @@ function cleanRow(raw, line, defaultChannel = "") {
   if (str(ratePct) !== "" && (row.in_rate === null || row.in_rate < 0 || row.in_rate > 100)) row.errors.push("rate must be a percentage between 0 and 100");
   if (str(fee) !== "" && (row.in_charges === null || row.in_charges < 0)) row.errors.push("charges must be a number, 0 or more");
   else if (row.in_charges !== null && row.amount !== null && row.in_charges > row.amount) row.errors.push("charges cannot be more than the amount");
-  if (str(net) !== "" && (row.in_settled === null || row.in_settled < 0 || (row.amount !== null && row.in_settled > row.amount))) {
-    row.errors.push("settled_amount must be a number between 0 and the amount");
+  // settled_amount is a money-in concept (what the business received); on money out it is ignored, never an error
+  if (row.direction !== "out" && str(net) !== "") {
+    if (row.in_settled === null || row.in_settled < 0 || (row.amount !== null && row.in_settled > row.amount)) {
+      row.errors.push("settled_amount must be a number between 0 and the amount");
+    }
   }
   return row;
 }
@@ -196,6 +207,14 @@ async function classify(conn, rawRows, hive, defaultChannel = "") {
       }
       r.disbursed = round2(r.amount - r.charge);
       if (r.mismatch) r.flags.push("charge_mismatch");
+    }
+
+    // money out: show the fee in the preview (settled is not used; no settled / disbursed figure)
+    if (r.direction === "out") {
+      const fee = r.extra.charges ?? 0;
+      r.charge = fee;
+      r.rate = r.in_rate !== null && r.in_charges === null ? r.in_rate : r.amount > 0 ? Math.round((fee / r.amount) * 1e6) / 1e4 : 0;
+      r.rate_source = r.in_charges !== null ? (r.in_rate !== null ? "sheet" : "sheet (rate from charges)") : r.in_rate !== null ? "sheet (charges from rate)" : "none given (0)";
     }
 
     // ignore rounding noise: only flag a real difference (1 currency unit or more)

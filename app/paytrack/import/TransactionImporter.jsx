@@ -30,9 +30,9 @@ const GUIDE = [
   ["channel", "Yes*", "Channel name; created if new. *Can be left out if you pick a channel for the file on the upload screen. See the Channels sheet"],
   ["payment_mode", "Yes*", "mpesa / cash / card / bank. *Blank defaults to card when card_scheme is filled"],
   ["amount", "Yes*", "Statement 'Gross'. What the client paid. *If blank it is rebuilt from fee + net, fee + rate, or net + rate"],
-  ["rate", "No", "Statement 'Fee %'. Blank = worked out, or the channel's rate"],
-  ["charges", "No", "Statement 'Fee'. Actual fee amount"],
-  ["settled_amount", "No", "Statement 'Net'. What the merchant actually received. Trusted over fee and rate; if they disagree the row is flagged 'charge mismatch'"],
+  ["rate", "No", "Fee %. Money in: blank = worked out, or the channel's rate. Money out: a percentage of the amount; blank and no charges = 0"],
+  ["charges", "No", "Fee amount. Money out: paid ON TOP of the amount (send 1,000 + fee 30 = 1,030 leaves the account). Rate and charges can be given either or both; neither = 0"],
+  ["settled_amount", "No", "MONEY IN ONLY: statement 'Net', what the business actually received (amount minus fee). Trusted over fee and rate; if they disagree the row is flagged 'charge mismatch'. Ignored on money out"],
   ["currency", "No", "Default KES"],
   ["payer_name / payer_phone", "No", "Money in: client created/linked. Money out: payee name/phone"],
   ["reference", "No", "Statement 'Guest Ref' / invoice / receipt ref. Same ref + amount twice = possible duplicate"],
@@ -41,7 +41,8 @@ const GUIDE = [
   ["settlement_date / card_scheme / origin / description / batch", "No", "Statement 'Settlement Date', 'Card', 'Origin', 'Description', 'Batch'. Kept on the transaction"],
   ["category", "No", "Money out only: what kind of payment it was (Supplier payments, Payments to mobile numbers, Transfers to bank, Paybill payments, Cash withdrawals through agents). Groups the Owners Report"],
   ["balance", "No", "Running balance shown on the statement after this row. The latest one is used as the account balance in the Owners Report"],
-  ["(M-PESA layout)", "No", "A statement with separate 'Paid in' and 'Withdrawn' columns also works: a row with only Withdrawn is money out, and 'Fee' is kept as that payment's charge"],
+  ["(M-PESA layout)", "No", "A statement with separate 'Paid in' and 'Withdrawn' columns also works: a row with only Withdrawn is money out, and 'Fee' is that payment's charge"],
+  ["(money out)", "", "Needs channel and payment_mode like money in. amount = what the business paid out; charges and/or rate = the fee on top. No settled amount"],
 ];
 
 const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
