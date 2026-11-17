@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { mosyPostData } from "../../MosyUtils/hiveUtils";
 import { getApiRoutes } from "../AppRoutes/apiRoutesHandler";
@@ -7,48 +7,68 @@ import { getApiRoutes } from "../AppRoutes/apiRoutesHandler";
 const endpoint = getApiRoutes().payments.importTransactions;
 const MAX_BYTES = 10 * 1024 * 1024;
 
-const HEADERS = ["type", "transaction_id", "transaction_date", "channel", "payment_mode", "amount", "currency", "payer_name", "payer_phone", "reference", "expected_amount", "rate", "charges", "settled_amount", "status"];
-const SAMPLE = [
-  ["money_in", "TX-9001", "2026-11-01 09:20:00", "Nairobi CBD", "mpesa", 5000, "KES", "Jane Wanjiku", "0711000001", "INV-1001", 5000, 1.5, "", "", "completed"],
-  ["money_in", "TX-9002", "2026-11-01 11:00:00", "Nairobi CBD", "bank", 11500, "KES", "Peter Otieno", "0722000002", "INV-1002", 12000, "", 150, "", "completed"],
-  ["money_in", "TX-9003", "2026-11-02 10:10:00", "Nairobi CBD", "mpesa", 3500, "KES", "Amina Hassan", "0733000003", "INV-1003", 3500, "", "", 3447.5, "completed"],
-  ["money_out", "OUT-5001", "2026-11-02 15:00:00", "Nairobi CBD", "bank", 3000, "KES", "Office Supplies Ltd", "0733000009", "PO-221", 3000, "", "", "", "completed"],
+// Original column order, with the money columns grouped in the acquirer statement's order
+// (Gross, Fee %, Fee, Net). Optional statement details sit at the end.
+// The statement's own header names are also accepted, so an exported statement can be uploaded as-is.
+const HEADERS = ["type", "transaction_id", "transaction_date", "channel", "payment_mode", "amount", "rate", "charges", "settled_amount", "currency", "payer_name", "payer_phone", "reference", "expected_amount", "status", "settlement_date", "card_scheme", "origin", "description", "batch"];
+const sampleRows = (ch) => [
+  // full statement row: gross, fee %, fee and net all present
+  ["money_in", "SC-HOT-0002", "2026-11-04", ch, "card", 8500, 2.5, 212.5, 8287.5, "KES", "", "", "GUEST-1062", "", "completed", "2026-11-05", "Visa", "International", "Restaurant and bar", "BATCH-261104-01"],
+  // only the net settlement is known: fee and rate are worked out (437.50 = 3.5%)
+  ["money_in", "SC-HOT-0003", "2026-11-07", ch, "card", 12500, "", "", 12062.5, "KES", "", "", "GUEST-1093", "", "completed", "2026-11-08", "Mastercard", "Domestic", "Conference booking", "BATCH-261107-01"],
+  // no fee info at all: the channel's configured rate is used
+  ["money_in", "MP-0001", "2026-11-08", ch, "mpesa", 5000, "", "", "", "KES", "Jane Wanjiku", "0711000001", "INV-2001", 5000, "completed", "", "", "", "Walk-in payment", ""],
+  ["money_out", "OUT-5001", "2026-11-09", ch, "bank", 3000, "", "", "", "KES", "Office Supplies Ltd", "0733000009", "PO-221", "", "completed", "", "", "", "Supplier payment", ""],
 ];
+const SAMPLE = sampleRows("Savannah Crown");
 const GUIDE = [
   ["Column", "Required", "Notes"],
   ["type", "No", "money_in (default) or money_out. Money out is saved as a Money Out business event"],
-  ["transaction_id", "Yes", "Unique per payment; duplicates are skipped on re-upload"],
-  ["transaction_date", "Yes", "YYYY-MM-DD HH:MM:SS"],
-  ["channel", "Yes", "Channel name; created automatically if new"],
-  ["payment_mode", "Yes", "mpesa / cash / card / bank"],
-  ["amount", "Yes", "What the client paid. Plain number"],
+  ["transaction_id", "Yes", "Statement 'Transaction ID'. Unique per payment; duplicates are skipped on re-upload"],
+  ["transaction_date", "Yes", "Statement 'Txn Date'. YYYY-MM-DD (time optional)"],
+  ["channel", "Yes*", "Channel name; created if new. *Can be left out if you pick a channel for the file on the upload screen. See the Channels sheet"],
+  ["payment_mode", "Yes*", "mpesa / cash / card / bank. *Blank defaults to card when card_scheme is filled"],
+  ["amount", "Yes*", "Statement 'Gross'. What the client paid. *If blank it is rebuilt from fee + net, fee + rate, or net + rate"],
+  ["rate", "No", "Statement 'Fee %'. Blank = worked out, or the channel's rate"],
+  ["charges", "No", "Statement 'Fee'. Actual fee amount"],
+  ["settled_amount", "No", "Statement 'Net'. What the merchant actually received. Trusted over fee and rate; if they disagree the row is flagged 'charge mismatch'"],
   ["currency", "No", "Default KES"],
   ["payer_name / payer_phone", "No", "Money in: client created/linked. Money out: payee name/phone"],
-  ["reference", "No", "Invoice / receipt ref; same ref + amount twice = possible duplicate"],
-  ["expected_amount", "No", "Difference is flagged as underpaid / overpaid"],
-  ["rate", "No", "Charge % for this transaction. Charges are computed from it. Blank = channel rate"],
-  ["charges", "No", "Actual charge amount. Wins over everything; the rate is computed from it. Fill both to keep both as entered"],
-  ["settled_amount", "No", "What was paid out to the merchant after charges. Charges = amount - settled. Don't fill it together with charges unless they add up"],
+  ["reference", "No", "Statement 'Guest Ref' / invoice / receipt ref. Same ref + amount twice = possible duplicate"],
+  ["expected_amount", "No", "Difference of 1 or more is flagged as underpaid / overpaid"],
   ["status", "No", "Default completed"],
+  ["settlement_date / card_scheme / origin / description / batch", "No", "Statement 'Settlement Date', 'Card', 'Origin', 'Description', 'Batch'. Kept on the transaction"],
 ];
 
 const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const label = (k) => String(k).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const size = (b) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`);
 
-function downloadTemplate() {
+// channels = the live channel list (name + configured rates), merged into the template as a reference sheet
+function downloadTemplate(channels = []) {
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([HEADERS, ...SAMPLE]);
+  const ws = XLSX.utils.aoa_to_sheet([HEADERS, ...(channels.length ? sampleRows(channels[0].name) : SAMPLE)]);
   ws["!cols"] = HEADERS.map((h) => ({ wch: Math.max(14, h.length + 2) }));
   XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+
+  const pct = (v) => (v === null || v === undefined || v === "" ? "" : Number(v));
+  const c = XLSX.utils.aoa_to_sheet([
+    ["Channel (use exactly this name)", "Cash %", "Card %", "M-Pesa %", "Default %"],
+    ...channels.map((x) => [x.name, pct(x.cash), pct(x.card), pct(x.mpesa), pct(x.default)]),
+    ...(channels.length ? [] : [["(no channels yet, new ones are created from the channel column)"]]),
+  ]);
+  c["!cols"] = [{ wch: 34 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
+  XLSX.utils.book_append_sheet(wb, c, "Channels");
+
   const g = XLSX.utils.aoa_to_sheet(GUIDE);
-  g["!cols"] = [{ wch: 26 }, { wch: 10 }, { wch: 70 }];
+  g["!cols"] = [{ wch: 38 }, { wch: 10 }, { wch: 110 }];
   XLSX.utils.book_append_sheet(wb, g, "Guide");
   XLSX.writeFile(wb, "paytrack_transactions_template.xlsx");
 }
 
 const Pill = ({ tone = "", children }) => <span className={`imp-pill ${tone}`}>{children}</span>;
-const PILL_TONE = { in: "", out: "red", valid: "", error: "red", duplicate: "muted", underpaid: "amber", overpaid: "blue", possible_duplicate: "amber", unverified: "muted" };
+const PILL_TONE = { in: "", out: "red", valid: "", error: "red", duplicate: "muted", underpaid: "amber", overpaid: "blue", possible_duplicate: "amber", charge_mismatch: "amber", amount_derived: "blue", unverified: "muted" };
+const INFO_FLAGS = ["unverified", "amount_derived"]; // informational only, not counted as "flagged"
 
 function Stat({ label: l, value, tone = "" }) {
   return (
@@ -84,7 +104,7 @@ function Summary({ s }) {
         <Stat label="Ready to import" value={s.valid} tone="green" />
         <Stat label="Errors" value={s.errors} tone={s.errors ? "red" : ""} />
         <Stat label="Duplicates skipped" value={s.duplicates} />
-        <Stat label="Flagged (under/over/dup)" value={s.underpaid + s.overpaid + s.possible_duplicates} tone={s.underpaid + s.overpaid + s.possible_duplicates ? "amber" : ""} />
+        <Stat label="Flagged (needs review)" value={s.underpaid + s.overpaid + s.possible_duplicates + s.charge_mismatches} tone={s.underpaid + s.overpaid + s.possible_duplicates + s.charge_mismatches ? "amber" : ""} />
         <Stat label={`Money in (${s.count_in})`} value={money(s.money_in)} tone="green" />
         <Stat label={`Money out (${s.count_out})`} value={money(s.money_out)} tone={s.money_out ? "red" : ""} />
         <Stat label="Net" value={money(s.net)} tone={s.net < 0 ? "red" : "green"} />
@@ -110,6 +130,11 @@ export default function TransactionImporter({ title = "Import Transactions", sub
   const [status, setStatus] = useState("idle"); // idle | validating | uploading | done
   const [dragOver, setDragOver] = useState(false);
   const [fillMsg, setFillMsg] = useState("");
+  const [history, setHistory] = useState([]);
+  const [channels, setChannels] = useState([]);
+  const [defaultChannel, setDefaultChannel] = useState(""); // applied to rows whose channel cell is blank
+  const [undoing, setUndoing] = useState("");
+  const [notice, setNotice] = useState("");
 
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
@@ -146,7 +171,7 @@ export default function TransactionImporter({ title = "Import Transactions", sub
       const rows = XLSX.utils.sheet_to_json(sheet, { raw: false, dateNF: "yyyy-mm-dd hh:mm:ss", defval: "", blankrows: false });
       if (!rows.length) throw new Error("The file has no usable rows.");
 
-      const res = await mosyPostData({ url: endpoint, data: { mode: "preview", rows } });
+      const res = await mosyPostData({ url: endpoint, data: { mode: "preview", rows, defaultChannel } });
       if (res.status !== "success") throw new Error(res.message || "Validation failed");
       setRawRows(rows); setPreview(res); setPage(1); setStatus("idle");
     } catch (e) {
@@ -165,13 +190,46 @@ export default function TransactionImporter({ title = "Import Transactions", sub
     }
   }
 
+  async function loadHistory() {
+    try {
+      const res = await mosyPostData({ url: endpoint, data: { mode: "history" } });
+      if (res.status === "success") setHistory(res.imports || []);
+    } catch { /* history is optional */ }
+  }
+  async function loadChannels() {
+    try {
+      const res = await mosyPostData({ url: endpoint, data: { mode: "channels" } });
+      if (res.status === "success") setChannels(res.channels || []);
+    } catch { /* picker is optional */ }
+  }
+  useEffect(() => { loadHistory(); loadChannels(); }, []);
+
+  async function handleUndo(importId, name) {
+    if (undoing) return;
+    if (!window.confirm(`Undo the import "${name}"?\n\nThis permanently removes the transactions, money out events and exceptions it created, plus any channels or clients it added that nothing else uses.`)) return;
+    setUndoing(importId); setFileError(""); setNotice("");
+    try {
+      const res = await mosyPostData({ url: endpoint, data: { mode: "undo", importId } });
+      if (res.status !== "success") throw new Error(res.message || "Undo failed");
+      const r = res.removed;
+      setNotice(`Import undone: removed ${r.transactions} transaction(s), ${r.events} money out event(s), ${r.exceptions} exception(s)` +
+        `${r.channels ? `, ${r.channels} channel(s)` : ""}${r.clients ? `, ${r.clients} client(s)` : ""}. You can fix the file and import again.`);
+      if (result?.import_id === importId) { setResult(null); setPreview(null); setStatus("idle"); }
+      await loadHistory();
+    } catch (e) {
+      setFileError(e.message);
+    } finally {
+      setUndoing("");
+    }
+  }
+
   async function handleImport() {
     if (!validated || !s.valid || status !== "idle") return;
-    setStatus("uploading"); setFileError("");
+    setStatus("uploading"); setFileError(""); setNotice("");
     try {
-      const res = await mosyPostData({ url: endpoint, data: { mode: "commit", rows: rawRows, fileName: file.name } });
+      const res = await mosyPostData({ url: endpoint, data: { mode: "commit", rows: rawRows, fileName: file.name, defaultChannel } });
       if (res.status !== "success") throw new Error(res.message || "Import failed");
-      setResult(res); setStatus("done");
+      setResult(res); setStatus("done"); loadHistory();
     } catch (e) {
       setFileError(e.message); setStatus("idle"); // failure rolls back, so retry is safe
     }
@@ -181,7 +239,7 @@ export default function TransactionImporter({ title = "Import Transactions", sub
     if (!preview) return [];
     const term = q.trim().toLowerCase();
     return preview.rows.filter((r) => {
-      if (filter === "flagged" ? !(r.state === "valid" && r.flags.some((f) => f !== "unverified")) : filter !== "all" && r.state !== filter) return false;
+      if (filter === "flagged" ? !(r.state === "valid" && r.flags.some((f) => !INFO_FLAGS.includes(f))) : filter !== "all" && r.state !== filter) return false;
       if (typeFilter !== "all" && r.direction !== typeFilter) return false;
       return !term || [r.transaction_id, r.branch, r.payment_mode, r.payer_name, r.reference].some((v) => String(v ?? "").toLowerCase().includes(term));
     });
@@ -225,6 +283,9 @@ export default function TransactionImporter({ title = "Import Transactions", sub
         .imp-file-name { font-weight: 600; font-size: .9rem; word-break: break-all; } .imp-file-meta { font-size: .75rem; color: #6b7280; }
         .imp-file-empty { color: #9ca3af; font-size: .9rem; }
         .imp-x { background: none; border: 0; color: #6b7280; cursor: pointer; padding: 4px 6px; }
+        .imp-chan { display: flex; flex-direction: column; gap: 4px; margin: 0; font-size: .8rem; color: #4b5563; }
+        .imp-chan select { border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 10px; font-size: .88rem; background: #fff; color: #111827; }
+        .imp-chan small { color: #6b7280; font-size: .72rem; }
         .imp-actions { display: grid; grid-template-columns: 1.1fr 1.1fr .8fr; gap: 8px; }
         @media (max-width: 520px) { .imp-actions { grid-template-columns: 1fr; } }
         .imp-btn { border: 1px solid #d1d5db; background: #fff; color: #111827; border-radius: 8px; padding: 9px 12px; font-weight: 600; font-size: .88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
@@ -306,6 +367,15 @@ export default function TransactionImporter({ title = "Import Transactions", sub
               )}
             </div>
 
+            <label className="imp-chan">
+              <span>Channel for this file</span>
+              <select value={defaultChannel} disabled={busy} onChange={(e) => { setDefaultChannel(e.target.value); if (validated) resetParsed(); }}>
+                <option value="">Use the channel column in the sheet</option>
+                {channels.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+              </select>
+              <small>For a merchant statement with no channel column, pick the merchant's channel here.</small>
+            </label>
+
             <div className="imp-actions">
               {!validated ? (
                 <button className="imp-btn primary" onClick={handleValidate} disabled={!file || busy}>
@@ -318,7 +388,7 @@ export default function TransactionImporter({ title = "Import Transactions", sub
                   {status === "uploading" ? "Importing..." : status === "done" ? "Imported" : `Import ${s.valid} rows`}
                 </button>
               )}
-              <button className="imp-btn" onClick={downloadTemplate}><i className="fa fa-download"></i> Download template</button>
+              <button className="imp-btn" onClick={() => downloadTemplate(channels)}><i className="fa fa-download"></i> Download template</button>
               <button className="imp-btn" onClick={handleClear} disabled={busy}><i className="fa fa-trash-o"></i> Clear</button>
             </div>
             <div className="imp-hint" style={{ marginTop: 0 }}>
@@ -351,8 +421,12 @@ export default function TransactionImporter({ title = "Import Transactions", sub
             {result.summary.new_clients > 0 && `, ${result.summary.new_clients} new client(s)`}
             {`, ${result.exceptions.length} exception(s) raised.`}
           </span>
+          <button className="imp-btn" style={{ marginLeft: "auto" }} disabled={!!undoing} onClick={() => handleUndo(result.import_id, file?.name || "this import")}>
+            <i className={`fa ${undoing === result.import_id ? "fa-spinner fa-spin" : "fa-undo"}`}></i> Undo import
+          </button>
         </div>
       )}
+      {notice && <div className="imp-alert ok"><span className="ico"><i className="fa fa-undo"></i></span><span>{notice}</span></div>}
 
       {/* analysis */}
       {validated && <Summary s={status === "done" && result ? result.summary : s} />}
@@ -391,7 +465,7 @@ export default function TransactionImporter({ title = "Import Transactions", sub
               <select value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1); }}>
                 <option value="all">All rows</option>
                 <option value="valid">Valid ({s.valid})</option>
-                <option value="flagged">Flagged ({s.underpaid + s.overpaid + s.possible_duplicates})</option>
+                <option value="flagged">Flagged ({s.underpaid + s.overpaid + s.possible_duplicates + s.charge_mismatches})</option>
                 <option value="error">Errors ({s.errors})</option>
                 <option value="duplicate">Duplicates ({s.duplicates})</option>
               </select>
@@ -456,6 +530,36 @@ export default function TransactionImporter({ title = "Import Transactions", sub
               )}
               <button className="imp-page" disabled={page === totalPages} onClick={() => setPage(page + 1)}><i className="fa fa-chevron-right"></i></button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* import history */}
+      {history.length > 0 && (
+        <div className="imp-card">
+          <div className="imp-head"><h5>Recent imports <span className="imp-badge">{history.length}</span></h5></div>
+          <div className="table-responsive">
+            <table className="imp-table">
+              <thead><tr><th>File</th><th>When</th><th className="num">Imported</th><th className="num">Skipped</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.record_id}>
+                    <td>{h.file_name || "-"}</td>
+                    <td>{h.completed_at ? new Date(h.completed_at).toLocaleString() : "-"}</td>
+                    <td className="num">{h.successful_rows} / {h.total_rows}</td>
+                    <td className="num">{Number(h.failed_rows || 0) + Number(h.duplicate_rows || 0)}</td>
+                    <td><Pill tone={h.status === "completed" ? "" : "muted"}>{label(h.status)}</Pill></td>
+                    <td className="num">
+                      {h.status === "completed" && (
+                        <button className="imp-btn" style={{ padding: "5px 10px" }} disabled={!!undoing} onClick={() => handleUndo(h.record_id, h.file_name || "this import")}>
+                          <i className={`fa ${undoing === h.record_id ? "fa-spinner fa-spin" : "fa-undo"}`}></i> Undo
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

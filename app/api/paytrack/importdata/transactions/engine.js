@@ -21,12 +21,16 @@ function resolveRate(channel, mode) {
 
 /* ---------- parsing / validation ---------- */
 
-const norm = (k) => String(k || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+// "Fee %" -> fee_pct, "Gross (KES)" -> gross_kes, "Txn Date" -> txn_date
+const norm = (k) => String(k || "").trim().toLowerCase().replace(/%/g, "_pct").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 const str = (v) => (v === null || v === undefined ? "" : String(v).trim());
 const num = (v) => {
-  const s = str(v).replace(/[,\s]/g, "");
+  const s = str(v).replace(/[,\s%]/g, "");
   return s !== "" && !isNaN(s) ? Number(s) : null;
 };
+// first non-blank value among a column's accepted header names (template names + acquirer statement names)
+const pick = (r, ...keys) => { for (const k of keys) if (str(r[k]) !== "") return r[k]; return ""; };
+const INFO_FLAGS = ["unverified", "amount_derived"]; // shown in preview, never raised as exceptions
 
 function parseDate(v) {
   const m = str(v).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
@@ -37,7 +41,7 @@ function parseDate(v) {
   return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
 }
 
-function cleanRow(raw, line) {
+function cleanRow(raw, line, defaultChannel = "") {
   const r = {};
   for (const k in raw) r[norm(k)] = raw[k];
 
@@ -45,52 +49,77 @@ function cleanRow(raw, line) {
   const direction = dirRaw === "" || ["in", "money_in", "received"].includes(dirRaw) ? "in"
     : ["out", "money_out", "paid", "paid_out"].includes(dirRaw) ? "out" : null;
 
+  // Each field accepts our template header and the acquirer-statement header.
+  const gross = pick(r, "amount", "gross", "gross_kes", "gross_amount");
+  const ratePct = pick(r, "rate", "fee_pct", "fee_percent", "fee_rate", "rate_pct");
+  const fee = pick(r, "charges", "fee", "fee_kes", "fee_amount");
+  const net = pick(r, "settled_amount", "net", "net_kes", "net_amount", "settled");
+  const card = str(pick(r, "card_scheme", "card", "card_type"));
+  const opt = (v) => (str(v) === "" ? null : num(v));
+
+  const settleRaw = str(pick(r, "settlement_date", "settled_on"));
+  const extra = Object.fromEntries(Object.entries({
+    settlement_date: settleRaw ? (parseDate(settleRaw)?.slice(0, 10) || settleRaw) : "",
+    card_scheme: card,
+    origin: str(r.origin),
+    description: str(r.description),
+    batch: str(r.batch),
+  }).filter(([, v]) => v !== ""));
+
   const row = {
     line,
     direction,
-    transaction_id: str(r.transaction_id),
-    transaction_at: parseDate(r.transaction_date),
-    branch: str(r.channel || r.branch), // sheet header is "channel"; "branch" still accepted
-    payment_mode: str(r.payment_mode).toLowerCase(),
-    amount: num(r.amount),
+    transaction_id: str(pick(r, "transaction_id", "txn_id", "transaction_ref")),
+    transaction_at: parseDate(pick(r, "transaction_date", "txn_date", "date", "transaction_at")),
+    branch: str(pick(r, "channel", "branch")) || str(defaultChannel), // "branch" header still accepted
+    payment_mode: str(pick(r, "payment_mode", "mode")).toLowerCase() || (card ? "card" : ""),
+    amount: opt(gross),
     currency: (str(r.currency) || "KES").toUpperCase(),
-    payer_name: str(r.payer_name),
+    payer_name: str(pick(r, "payer_name", "payer", "guest_name")),
     payer_phone: str(r.payer_phone),
-    reference: str(r.reference),
-    expected_amount: str(r.expected_amount) === "" ? null : num(r.expected_amount),
-    in_rate: str(r.rate) === "" ? null : num(r.rate),          // optional, from sheet (%)
-    in_charges: str(r.charges) === "" ? null : num(r.charges), // optional, from sheet (actual amount)
-    in_settled: str(r.settled_amount) === "" ? null : num(r.settled_amount), // optional: what was paid out to the merchant
+    reference: str(pick(r, "reference", "guest_ref", "ref")),
+    expected_amount: opt(r.expected_amount),
+    in_rate: opt(ratePct),     // optional, from sheet (%)
+    in_charges: opt(fee),      // optional, actual fee amount
+    in_settled: opt(net),      // optional, net paid out to the merchant
+    extra,
     status: (str(r.status) || "completed").toLowerCase(),
     errors: [],
     flags: [],
   };
 
+  // Gap-filling: a statement row can be missing the gross. Rebuild it from the other figures.
+  if (row.amount === null && str(gross) === "") {
+    let a = null;
+    if (row.in_charges !== null && row.in_settled !== null) a = row.in_charges + row.in_settled;
+    else if (row.in_charges !== null && row.in_rate) a = (row.in_charges * 100) / row.in_rate;
+    else if (row.in_settled !== null && row.in_rate !== null && row.in_rate < 100) a = row.in_settled / (1 - row.in_rate / 100);
+    if (a !== null) { row.amount = round2(a); row.flags.push("amount_derived"); }
+  }
+
   if (!direction) row.errors.push("type must be money_in or money_out");
   if (!row.transaction_id) row.errors.push("transaction_id is required");
   if (!row.transaction_at) row.errors.push("transaction_date missing or invalid (use YYYY-MM-DD HH:MM:SS)");
-  if (!row.branch) row.errors.push("channel is required");
+  if (!row.branch) row.errors.push("channel is required (add the column, or pick a channel for the file)");
   if (!row.payment_mode) row.errors.push("payment_mode is required");
-  if (row.amount === null) row.errors.push("amount must be a number");
+  if (row.amount === null) row.errors.push(str(gross) === "" ? "amount is missing and cannot be worked out from the fee / net" : "amount must be a number");
   else if (row.amount < 0) row.errors.push("amount cannot be negative");
   if (str(r.expected_amount) !== "" && row.expected_amount === null) row.errors.push("expected_amount must be a number");
-  if (str(r.rate) !== "" && (row.in_rate === null || row.in_rate < 0 || row.in_rate > 100)) row.errors.push("rate must be a percentage between 0 and 100");
-  if (str(r.charges) !== "" && (row.in_charges === null || row.in_charges < 0)) row.errors.push("charges must be a number, 0 or more");
+  if (str(ratePct) !== "" && (row.in_rate === null || row.in_rate < 0 || row.in_rate > 100)) row.errors.push("rate must be a percentage between 0 and 100");
+  if (str(fee) !== "" && (row.in_charges === null || row.in_charges < 0)) row.errors.push("charges must be a number, 0 or more");
   else if (row.in_charges !== null && row.amount !== null && row.in_charges > row.amount) row.errors.push("charges cannot be more than the amount");
-  if (str(r.settled_amount) !== "" && (row.in_settled === null || row.in_settled < 0 || (row.amount !== null && row.in_settled > row.amount))) {
+  if (str(net) !== "" && (row.in_settled === null || row.in_settled < 0 || (row.amount !== null && row.in_settled > row.amount))) {
     row.errors.push("settled_amount must be a number between 0 and the amount");
-  } else if (row.in_settled !== null && row.in_charges !== null && row.amount !== null && Math.abs(row.amount - row.in_charges - row.in_settled) > 0.01) {
-    row.errors.push("settled_amount + charges must equal amount (give just one of them, or make them add up)");
   }
   return row;
 }
 
 /** Classify rows: error | duplicate | valid, attach analysis flags. */
-async function classify(conn, rawRows, hive) {
+async function classify(conn, rawRows, hive, defaultChannel = "") {
   if (!Array.isArray(rawRows) || !rawRows.length) throw new Error("No rows found in file");
   if (rawRows.length > MAX_ROWS) throw new Error(`Too many rows (max ${MAX_ROWS} per upload)`);
 
-  const rows = rawRows.map((r, i) => cleanRow(r, i + 2)); // +2 = excel line number
+  const rows = rawRows.map((r, i) => cleanRow(r, i + 2, defaultChannel)); // +2 = excel line number
 
   // existing transaction ids in DB
   const existing = new Set();
@@ -125,17 +154,26 @@ async function classify(conn, rawRows, hive) {
     r.state = "valid";
 
     if (r.direction === "in") {
-      // amount = what the client paid; settled = what the merchant received.
-      // Precedence: charges > settled_amount > rate > channel rate. Whatever is
-      // missing is computed; rate/charges given together are kept as entered.
-      if (r.in_charges === null && r.in_settled !== null) {
+      // amount = what the client paid; settled (net) = what the merchant actually received.
+      // Net settlement is the source of truth, then charges, then rate, then the channel rate.
+      // Whatever is missing is computed; if the figures disagree the row is flagged
+      // "charge_mismatch" and the stored values follow the most reliable one.
+      const eff = (c) => (r.amount > 0 ? Math.round((c / r.amount) * 1e6) / 1e4 : 0);
+      const rateCharge = r.in_rate !== null ? round2(r.amount * (r.in_rate / 100)) : null;
+      if (r.in_settled !== null) {
         r.charge = round2(r.amount - r.in_settled);
-        r.rate = r.in_rate !== null ? r.in_rate : r.amount > 0 ? Math.round((r.charge / r.amount) * 1e6) / 1e4 : 0;
-        r.rate_source = r.in_rate !== null ? "sheet" : "sheet (from settled amount)";
+        r.rate = eff(r.charge);
+        const stated = r.in_charges !== null ? round2(r.in_charges) : rateCharge;
+        r.rate_source = stated === null ? "sheet (from settled amount)" : "sheet";
+        if (stated !== null && Math.abs(stated - r.charge) >= 1) r.mismatch = { expected: stated, actual: r.charge };
       } else if (r.in_charges !== null) {
         r.charge = round2(r.in_charges);
-        r.rate = r.in_rate !== null ? r.in_rate : r.amount > 0 ? Math.round((r.charge / r.amount) * 1e6) / 1e4 : 0;
+        r.rate = r.in_rate !== null ? r.in_rate : eff(r.charge);
         r.rate_source = r.in_rate !== null ? "sheet" : "sheet (rate from charges)";
+        if (rateCharge !== null && Math.abs(rateCharge - r.charge) >= 1) {
+          r.mismatch = { expected: rateCharge, actual: r.charge };
+          r.rate = eff(r.charge);
+        }
       } else if (r.in_rate !== null) {
         r.rate = r.in_rate;
         r.charge = round2(r.amount * (r.rate / 100));
@@ -146,6 +184,7 @@ async function classify(conn, rawRows, hive) {
         r.rate_source = "channel";
       }
       r.disbursed = round2(r.amount - r.charge);
+      if (r.mismatch) r.flags.push("charge_mismatch");
     }
 
     // ignore rounding noise: only flag a real difference (1 currency unit or more)
@@ -197,6 +236,8 @@ function analyse(rows) {
     underpaid: flagCount("underpaid"),
     overpaid: flagCount("overpaid"),
     possible_duplicates: flagCount("possible_duplicate"),
+    charge_mismatches: flagCount("charge_mismatch"),
+    amount_derived: flagCount("amount_derived"),
     unverified: flagCount("unverified"),
     by_branch: group((r) => r.branch),
     by_mode: group((r) => r.payment_mode),
@@ -212,11 +253,27 @@ const slim = (r) => ({
 
 /* ---------- public API ---------- */
 
-export async function previewTransactions(rawRows, authData) {
+/** Channels with their configured rates (for the channel picker and the template's Channels sheet). */
+export async function listChannels(authData) {
+  const conn = await connectDB();
+  try {
+    const [rows] = await conn.query(
+      `SELECT branch_name AS name, transaction_rate_cash AS cash, transaction_rate_card AS card,
+              transaction_rate_mpesa AS mpesa, default_transaction_rate AS \`default\`
+       FROM ${T("branches")} WHERE hive_site_id <=> ? ORDER BY branch_name`,
+      [authData.hive_site_id ?? null]
+    );
+    return { channels: rows };
+  } finally {
+    await conn.end();
+  }
+}
+
+export async function previewTransactions(rawRows, authData, defaultChannel = "") {
   const conn = await connectDB();
   try {
     const hive = { id: authData.hive_site_id ?? null, name: authData.hive_site_name ?? null };
-    const rows = await classify(conn, rawRows, hive);
+    const rows = await classify(conn, rawRows, hive, defaultChannel);
     const newBranches = new Set();
     const [bs] = await conn.query(`SELECT branch_name FROM ${T("branches")} WHERE hive_site_id <=> ?`, [hive.id]);
     const have = new Set(bs.map((b) => b.branch_name.toLowerCase()));
@@ -227,7 +284,7 @@ export async function previewTransactions(rawRows, authData) {
   }
 }
 
-export async function commitTransactions(rawRows, authData, fileName = "upload.xlsx") {
+export async function commitTransactions(rawRows, authData, fileName = "upload.xlsx", defaultChannel = "") {
   const conn = await connectDB();
   const hive = { id: authData.hive_site_id ?? null, name: authData.hive_site_name ?? null };
   const uploader = authData.user_id || authData.record_id || authData.email || null;
@@ -244,7 +301,7 @@ export async function commitTransactions(rawRows, authData, fileName = "upload.x
 
   try {
     await conn.beginTransaction();
-    const rows = await classify(conn, rawRows, hive);
+    const rows = await classify(conn, rawRows, hive, defaultChannel);
     const valid = rows.filter((r) => r.state === "valid");
     const validIn = valid.filter((r) => r.direction === "in");
     const importId = magicRandomStr(12);
@@ -303,7 +360,7 @@ export async function commitTransactions(rawRows, authData, fileName = "upload.x
       const rid = magicRandomStr(12);
       const branch_id = branchMap.get(r.branch.toLowerCase());
       const isOut = r.direction === "out";
-      const meta = JSON.stringify({ import_id: importId, expected_amount: r.expected_amount, ...(isOut ? { payee_name: r.payer_name, payee_phone: r.payer_phone } : {}) });
+      const meta = JSON.stringify({ import_id: importId, expected_amount: r.expected_amount, ...r.extra, ...(isOut ? { payee_name: r.payer_name, payee_phone: r.payer_phone } : {}) });
       if (isOut) {
         events.push({
           record_id: rid, branch_id, event_id: r.transaction_id, event_type: "Money Out", external_ref: r.reference || null,
@@ -316,14 +373,17 @@ export async function commitTransactions(rawRows, authData, fileName = "upload.x
         payer_phone: r.payer_phone || null, payment_mode: r.payment_mode, transaction_at: r.transaction_at,
         status: r.status, metadata: meta, rate: r.rate, rate_amount: r.charge, disbursed: r.disbursed, ...base,
       });
-      r.flags.filter((f) => f !== "unverified").forEach((f) => {
-        const diff = f === "possible_duplicate" ? 0 : r.amount - r.expected_amount;
+      r.flags.filter((f) => !INFO_FLAGS.includes(f)).forEach((f) => {
+        const isFee = f === "charge_mismatch";
+        const expected = isFee ? r.mismatch.expected : r.expected_amount ?? 0;
+        const actual = isFee ? r.mismatch.actual : r.amount;
+        const diff = f === "possible_duplicate" ? 0 : isFee ? round2(actual - expected) : r.amount - r.expected_amount;
         exceptions.push({
           record_id: magicRandomStr(12), branch_id, ...(isOut ? { event_id: rid } : { payment_transaction_id: rid }), exception_type: f,
           severity: f === "possible_duplicate" ? "high" : "medium",
-          title: { underpaid: "Underpaid transaction", overpaid: "Overpaid transaction", possible_duplicate: "Possible duplicate payment" }[f],
+          title: { underpaid: "Underpaid transaction", overpaid: "Overpaid transaction", possible_duplicate: "Possible duplicate payment", charge_mismatch: "Fee does not match settlement" }[f],
           description: `${isOut ? "OUT " : ""}${r.transaction_id} (${r.branch}) ref ${r.reference || "-"}`,
-          expected_amount: r.expected_amount ?? 0, actual_amount: r.amount, difference_amount: diff, status: "open", ...base,
+          expected_amount: expected, actual_amount: actual, difference_amount: diff, status: "open", ...base,
         });
       });
     });
@@ -336,7 +396,11 @@ export async function commitTransactions(rawRows, authData, fileName = "upload.x
     await bulk("imports", ["record_id", "file_name", "file_type", "total_rows", "successful_rows", "failed_rows", "duplicate_rows", "status", "error_log", "uploaded_by", "started_at", "completed_at", "hive_site_id", "hive_site_name"], [{
       record_id: importId, file_name: fileName, file_type: "transactions", total_rows: summary.total_rows,
       successful_rows: summary.valid, failed_rows: summary.errors, duplicate_rows: summary.duplicates, status: "completed",
-      error_log: JSON.stringify(rows.filter((r) => r.state === "error").slice(0, 200).map((r) => ({ line: r.line, errors: r.errors }))),
+      // row errors for reference + ids of everything this import created (used by undo)
+      error_log: JSON.stringify({
+        errors: rows.filter((r) => r.state === "error").slice(0, 200).map((r) => ({ line: r.line, errors: r.errors })),
+        created: { branches: newBranches.map((b) => b.record_id), sources: newSources.map((x) => x.record_id), clients: newClients.map((c) => c.record_id) },
+      }),
       uploaded_by: uploader, started_at: startedAt, completed_at: new Date(), ...base,
     }]);
 
@@ -375,6 +439,96 @@ export async function backfillRates(authData) {
       [authData.hive_site_id ?? null]
     );
     return { updated: res.affectedRows };
+  } finally {
+    await conn.end();
+  }
+}
+
+/* ---------- import history + undo ---------- */
+
+export async function listImports(authData) {
+  const conn = await connectDB();
+  try {
+    const [rows] = await conn.query(
+      `SELECT record_id, file_name, total_rows, successful_rows, failed_rows, duplicate_rows, status, completed_at
+       FROM ${T("imports")} WHERE hive_site_id <=> ? AND file_type = 'transactions'
+       ORDER BY primkey DESC LIMIT 10`,
+      [authData.hive_site_id ?? null]
+    );
+    return { imports: rows };
+  } finally {
+    await conn.end();
+  }
+}
+
+/** Remove everything a single import created, in one transaction. */
+export async function undoImport(importId, authData) {
+  if (!/^[A-Za-z0-9]+$/.test(String(importId || ""))) throw new Error("Invalid import id");
+  const hive = authData.hive_site_id ?? null;
+  const conn = await connectDB();
+  const inList = async (sql, ids) => (ids.length ? (await conn.query(sql, [hive, ids]))[0] : []);
+  const chunked = async (sql, ids) => {
+    let n = 0;
+    for (let i = 0; i < ids.length; i += 1000) n += (await conn.query(sql, [hive, ids.slice(i, i + 1000)]))[0].affectedRows;
+    return n;
+  };
+
+  try {
+    await conn.beginTransaction();
+
+    const [found] = await conn.query(
+      `SELECT record_id, status, error_log FROM ${T("imports")} WHERE record_id = ? AND hive_site_id <=> ? FOR UPDATE`,
+      [importId, hive]
+    );
+    const imp = found[0];
+    if (!imp) throw new Error("Import not found");
+    if (imp.status !== "completed") throw new Error(`This import is already ${imp.status}`);
+
+    let created = {};
+    try { created = JSON.parse(imp.error_log || "{}")?.created || {}; } catch { /* old-format log: nothing extra to remove */ }
+
+    const like = `%"import_id":"${importId}"%`;
+    const [txs] = await conn.query(`SELECT record_id FROM ${T("payment_transactions")} WHERE hive_site_id <=> ? AND metadata LIKE ?`, [hive, like]);
+    const [evs] = await conn.query(`SELECT record_id FROM ${T("business_events")} WHERE hive_site_id <=> ? AND metadata LIKE ?`, [hive, like]);
+    const txIds = txs.map((r) => r.record_id);
+    const evIds = evs.map((r) => r.record_id);
+
+    const exceptions =
+      (await chunked(`DELETE FROM ${T("exceptions")} WHERE hive_site_id <=> ? AND payment_transaction_id IN (?)`, txIds)) +
+      (await chunked(`DELETE FROM ${T("exceptions")} WHERE hive_site_id <=> ? AND event_id IN (?)`, evIds));
+    await chunked(`DELETE FROM ${T("payment_transactions")} WHERE hive_site_id <=> ? AND record_id IN (?)`, txIds);
+    await chunked(`DELETE FROM ${T("business_events")} WHERE hive_site_id <=> ? AND record_id IN (?)`, evIds);
+
+    // Channels / payment sources / clients this import created are removed only if nothing else uses them.
+    const cb = created.branches || [], cs = created.sources || [], cc = created.clients || [];
+    const usedB = new Set([
+      ...(await inList(`SELECT DISTINCT branch_id AS id FROM ${T("payment_transactions")} WHERE hive_site_id <=> ? AND branch_id IN (?)`, cb)),
+      ...(await inList(`SELECT DISTINCT branch_id AS id FROM ${T("business_events")} WHERE hive_site_id <=> ? AND branch_id IN (?)`, cb)),
+    ].map((r) => r.id));
+    const usedS = new Set((await inList(`SELECT DISTINCT payment_source_id AS id FROM ${T("payment_transactions")} WHERE hive_site_id <=> ? AND payment_source_id IN (?)`, cs)).map((r) => r.id));
+    const usedC = new Set((await inList(
+      `SELECT c.record_id AS id FROM ${T("clients")} c WHERE c.hive_site_id <=> ? AND c.record_id IN (?) AND EXISTS (
+         SELECT 1 FROM ${T("payment_transactions")} p WHERE p.hive_site_id <=> c.hive_site_id
+           AND ((c.phone IS NOT NULL AND c.phone <> '' AND p.payer_phone = c.phone)
+             OR ((c.phone IS NULL OR c.phone = '') AND p.payer_name = c.client_name)))`, cc)).map((r) => r.id));
+
+    const removeUnused = async (table, ids, used) => {
+      const del = ids.filter((id) => !used.has(id));
+      await chunked(`DELETE FROM ${T(table)} WHERE hive_site_id <=> ? AND record_id IN (?)`, del);
+      return del.length;
+    };
+    const removed = {
+      channels: await removeUnused("branches", cb, usedB),
+      sources: await removeUnused("payment_sources", cs, usedS),
+      clients: await removeUnused("clients", cc, usedC),
+    };
+
+    await conn.query(`UPDATE ${T("imports")} SET status = 'undone' WHERE record_id = ? AND hive_site_id <=> ?`, [importId, hive]);
+    await conn.commit();
+    return { removed: { transactions: txIds.length, events: evIds.length, exceptions, ...removed } };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
   } finally {
     await conn.end();
   }

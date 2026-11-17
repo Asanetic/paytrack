@@ -186,6 +186,10 @@ export async function GET(request) {
         title: `Paid KES ${kes(Math.abs(r.difference_amount))} more than expected`,
         detail: `Expected KES ${kes(r.expected_amount)}, received KES ${kes(r.actual_amount)}`,
       }),
+      charge_mismatch: (r) => ({
+        title: "Statement fee does not match settlement",
+        detail: `Stated fee KES ${kes(r.expected_amount)}, but amount minus net settled is KES ${kes(r.actual_amount)}`,
+      }),
       possible_duplicate: (r) => ({
         title: "Possible duplicate payment",
         detail: `Same reference and amount (KES ${kes(r.actual_amount)}) appears more than once`,
