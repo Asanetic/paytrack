@@ -73,9 +73,9 @@
   flex: 0 0 48px; height: 48px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff;
 }
-.sgi-stat-body { min-width: 0; }
+.sgi-stat-body { flex: 1; min-width: 0; container-type: inline-size; }
 .sgi-stat-label { font-size: 13.5px; color: var(--sgi-text-2); font-weight: 500; }
-.sgi-stat-value { font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; margin: 2px 0 6px; }
+.sgi-stat-value { font-size: clamp(15px, 11cqw, 24px); font-weight: 700; letter-spacing: -.02em; line-height: 1.25; margin: 2px 0 6px; overflow-wrap: anywhere; }
 .sgi-stat-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: var(--sgi-muted); }
 .sgi-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 6px; font-weight: 600; font-size: 12px; }
 .sgi-chip.is-up { background: #e7f8ee; color: #0f8a43; }
@@ -261,7 +261,7 @@
   .sgi-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .sgi-stat { flex-direction: column; gap: 10px; padding: 14px; }
   .sgi-stat-icon { flex-basis: auto; width: 38px; height: 38px; font-size: 16px; border-radius: 10px; }
-  .sgi-stat-value { font-size: 18px; }
+  .sgi-stat-value { font-size: clamp(14px, 10cqw, 18px); }
   .sgi-donut-wrap { grid-template-columns: 1fr; justify-items: center; gap: 16px; }
   .sgi-legend { width: 100%; }
   .sgi-bars li { grid-template-columns: 56px minmax(0, 1fr) 44px; }
