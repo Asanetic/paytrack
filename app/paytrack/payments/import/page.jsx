@@ -1,15 +1,12 @@
 import { Suspense } from 'react';
 
-import ImportCSVComponent from '../../import/uploadData';
+import TransactionImporter from '../../import/TransactionImporter';
 import { hiveRoutes } from '../../../appConfigs/hiveRoutes';
 
-import { getApiRoutes } from '../../AppRoutes/apiRoutesHandler';
-import { PaymentsSchema } from '../PaymentsSchema';
 
-const apiRoutes = getApiRoutes()
 
 export async function generateMetadata({ searchParams }) {
-  const mosyTitle = 'Import Payments data ';
+  const mosyTitle = 'Import transactions';
 
   return {
     title: mosyTitle ,
@@ -24,7 +21,6 @@ export async function generateMetadata({ searchParams }) {
 
 export default function UploadCsvPage() {
 
-   const colsArray = PaymentsSchema.exportColumns
 
    return (
      <>
@@ -33,7 +29,7 @@ export default function UploadCsvPage() {
              <div className='content container-fluid p-0 m-0'>
               <div className='p-3'>
                <Suspense fallback={<div className='col-md-12 p-5 text-center h3'>Loading...</div>}>
-               <ImportCSVComponent colsArray={colsArray} title='Import Payments data ' endpoint={PaymentsSchema.importDataEndpoint} templateName={`import_Payments_data__template.csv`}/>
+               <TransactionImporter />
               </Suspense>
             </div>
              </div>

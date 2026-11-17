@@ -53,7 +53,8 @@
     "payments": {
         "base": "/api/paytrack/payments/list",
         "delete": "/api/paytrack/payments/list/delete",
-        "import": "/api/paytrack/payments/import"
+        "import": "/api/paytrack/payments/import",
+        "importTransactions": "/api/paytrack/importdata/transactions"
     },
     "loanapplications": {
         "base": "/api/paytrack/loanapplications/list",
