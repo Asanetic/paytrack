@@ -27,11 +27,16 @@ function cleanRow(raw, line) {
   const r = {};
   for (const k in raw) r[norm(k)] = raw[k];
 
+  const dirRaw = str(r.type || r.transaction_type).toLowerCase().replace(/[\s-]+/g, "_");
+  const direction = dirRaw === "" || ["in", "money_in", "received"].includes(dirRaw) ? "in"
+    : ["out", "money_out", "paid", "paid_out"].includes(dirRaw) ? "out" : null;
+
   const row = {
     line,
+    direction,
     transaction_id: str(r.transaction_id),
     transaction_at: parseDate(r.transaction_date),
-    branch: str(r.branch),
+    branch: str(r.channel || r.branch), // sheet header is "channel"; "branch" still accepted
     payment_mode: str(r.payment_mode).toLowerCase(),
     amount: num(r.amount),
     currency: (str(r.currency) || "KES").toUpperCase(),
@@ -44,9 +49,10 @@ function cleanRow(raw, line) {
     flags: [],
   };
 
+  if (!direction) row.errors.push("type must be money_in or money_out");
   if (!row.transaction_id) row.errors.push("transaction_id is required");
   if (!row.transaction_at) row.errors.push("transaction_date missing or invalid (use YYYY-MM-DD HH:MM:SS)");
-  if (!row.branch) row.errors.push("branch is required");
+  if (!row.branch) row.errors.push("channel is required");
   if (!row.payment_mode) row.errors.push("payment_mode is required");
   if (row.amount === null) row.errors.push("amount must be a number");
   else if (row.amount < 0) row.errors.push("amount cannot be negative");
@@ -62,33 +68,36 @@ async function classify(conn, rawRows, hive) {
   const rows = rawRows.map((r, i) => cleanRow(r, i + 2)); // +2 = excel line number
 
   // existing transaction ids in DB
-  const ids = [...new Set(rows.map((r) => r.transaction_id).filter(Boolean))];
   const existing = new Set();
-  for (let i = 0; i < ids.length; i += 1000) {
-    const [found] = await conn.query(
-      `SELECT transaction_id FROM ${T("payment_transactions")} WHERE hive_site_id <=> ? AND transaction_id IN (?)`,
-      [hive.id, ids.slice(i, i + 1000)]
-    );
-    found.forEach((f) => existing.add(f.transaction_id));
+  for (const [dir, table, col] of [["in", "payment_transactions", "transaction_id"], ["out", "business_events", "event_id"]]) {
+    const ids = [...new Set(rows.filter((r) => r.direction === dir && r.transaction_id).map((r) => r.transaction_id))];
+    for (let i = 0; i < ids.length; i += 1000) {
+      const [found] = await conn.query(
+        `SELECT \`${col}\` AS id FROM ${T(table)} WHERE hive_site_id <=> ? AND \`${col}\` IN (?)`,
+        [hive.id, ids.slice(i, i + 1000)]
+      );
+      found.forEach((f) => existing.add(`${dir}|${f.id}`));
+    }
   }
 
   const seenId = new Set();
   const seenRef = new Set();
   for (const r of rows) {
     if (r.errors.length) { r.state = "error"; continue; }
-    if (existing.has(r.transaction_id) || seenId.has(r.transaction_id)) {
+    const idKey = `${r.direction}|${r.transaction_id}`;
+    if (existing.has(idKey) || seenId.has(idKey)) {
       r.state = "duplicate";
-      r.errors.push(existing.has(r.transaction_id) ? "already imported" : "repeated transaction_id in file");
+      r.errors.push(existing.has(idKey) ? "already imported" : "repeated transaction_id in file");
       continue;
     }
-    seenId.add(r.transaction_id);
+    seenId.add(idKey);
     r.state = "valid";
 
     if (r.expected_amount !== null && r.amount !== r.expected_amount) {
       r.flags.push(r.amount < r.expected_amount ? "underpaid" : "overpaid");
     }
     if (r.reference) {
-      const key = `${r.branch.toLowerCase()}|${r.reference.toLowerCase()}|${r.amount}`;
+      const key = `${r.direction}|${r.branch.toLowerCase()}|${r.reference.toLowerCase()}|${r.amount}`;
       if (seenRef.has(key)) r.flags.push("possible_duplicate");
       seenRef.add(key);
     } else if (r.expected_amount === null) {
@@ -106,12 +115,15 @@ function analyse(rows) {
     const m = {};
     valid.forEach((r) => {
       const k = fn(r);
-      m[k] = m[k] || { key: k, count: 0, total: 0 };
+      m[k] = m[k] || { key: k, count: 0, in: 0, out: 0, total: 0 };
       m[k].count++;
-      m[k].total += r.amount;
+      m[k][r.direction] += r.amount;
+      m[k].total = m[k].in - m[k].out;
     });
-    return Object.values(m).sort((a, b) => b.total - a.total);
+    return Object.values(m).sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
   };
+  const sum = (dir) => valid.filter((r) => r.direction === dir).reduce((s, r) => s + r.amount, 0);
+  const money_in = sum("in"), money_out = sum("out");
   const flagCount = (f) => valid.filter((r) => r.flags.includes(f)).length;
 
   return {
@@ -119,7 +131,11 @@ function analyse(rows) {
     valid: valid.length,
     errors: rows.filter((r) => r.state === "error").length,
     duplicates: rows.filter((r) => r.state === "duplicate").length,
-    total_amount: valid.reduce((s, r) => s + r.amount, 0),
+    money_in,
+    money_out,
+    net: money_in - money_out,
+    count_in: valid.filter((r) => r.direction === "in").length,
+    count_out: valid.filter((r) => r.direction === "out").length,
     underpaid: flagCount("underpaid"),
     overpaid: flagCount("overpaid"),
     possible_duplicates: flagCount("possible_duplicate"),
@@ -131,7 +147,7 @@ function analyse(rows) {
 }
 
 const slim = (r) => ({
-  line: r.line, transaction_id: r.transaction_id, transaction_at: r.transaction_at, branch: r.branch,
+  line: r.line, direction: r.direction, transaction_id: r.transaction_id, transaction_at: r.transaction_at, branch: r.branch,
   payment_mode: r.payment_mode, amount: r.amount, payer_name: r.payer_name, reference: r.reference,
   expected_amount: r.expected_amount, state: r.state, flags: r.flags, errors: r.errors,
 });
@@ -172,6 +188,7 @@ export async function commitTransactions(rawRows, authData, fileName = "upload.x
     await conn.beginTransaction();
     const rows = await classify(conn, rawRows, hive);
     const valid = rows.filter((r) => r.state === "valid");
+    const validIn = valid.filter((r) => r.direction === "in");
     const importId = magicRandomStr(12);
 
     /* branches */
@@ -206,7 +223,7 @@ export async function commitTransactions(rawRows, authData, fileName = "upload.x
     const clientKeys = new Set();
     cs.forEach((c) => { if (c.phone) clientKeys.add(`p:${c.phone}`); clientKeys.add(`n:${String(c.client_name).toLowerCase()}`); });
     const newClients = [];
-    valid.forEach((r) => {
+    validIn.forEach((r) => {
       if (!r.payer_name && !r.payer_phone) return;
       const keys = [r.payer_phone && `p:${r.payer_phone}`, r.payer_name && `n:${r.payer_name.toLowerCase()}`].filter(Boolean);
       const known = r.payer_phone ? clientKeys.has(`p:${r.payer_phone}`) : clientKeys.has(`n:${r.payer_name.toLowerCase()}`);
@@ -222,29 +239,39 @@ export async function commitTransactions(rawRows, authData, fileName = "upload.x
 
     /* transactions + exceptions */
     const txs = [];
+    const events = [];
     const exceptions = [];
     valid.forEach((r) => {
       const rid = magicRandomStr(12);
       const branch_id = branchMap.get(r.branch.toLowerCase());
-      txs.push({
+      const isOut = r.direction === "out";
+      const meta = JSON.stringify({ import_id: importId, expected_amount: r.expected_amount, ...(isOut ? { payee_name: r.payer_name, payee_phone: r.payer_phone } : {}) });
+      if (isOut) {
+        events.push({
+          record_id: rid, branch_id, event_id: r.transaction_id, event_type: "Money Out", external_ref: r.reference || null,
+          amount: r.amount, currency: r.currency, payment_mode: r.payment_mode, occurred_at: r.transaction_at,
+          status: r.status, metadata: meta, ...base,
+        });
+      } else txs.push({
         record_id: rid, branch_id, payment_source_id: sourceMap.get(r.payment_mode), transaction_id: r.transaction_id,
         external_ref: r.reference || null, amount: r.amount, currency: r.currency, payer_name: r.payer_name || null,
         payer_phone: r.payer_phone || null, payment_mode: r.payment_mode, transaction_at: r.transaction_at,
-        status: r.status, metadata: JSON.stringify({ import_id: importId, expected_amount: r.expected_amount }), ...base,
+        status: r.status, metadata: meta, ...base,
       });
       r.flags.filter((f) => f !== "unverified").forEach((f) => {
         const diff = f === "possible_duplicate" ? 0 : r.amount - r.expected_amount;
         exceptions.push({
-          record_id: magicRandomStr(12), branch_id, payment_transaction_id: rid, exception_type: f,
+          record_id: magicRandomStr(12), branch_id, ...(isOut ? { event_id: rid } : { payment_transaction_id: rid }), exception_type: f,
           severity: f === "possible_duplicate" ? "high" : "medium",
           title: { underpaid: "Underpaid transaction", overpaid: "Overpaid transaction", possible_duplicate: "Possible duplicate payment" }[f],
-          description: `${r.transaction_id} (${r.branch}) ref ${r.reference || "-"}`,
+          description: `${isOut ? "OUT " : ""}${r.transaction_id} (${r.branch}) ref ${r.reference || "-"}`,
           expected_amount: r.expected_amount ?? 0, actual_amount: r.amount, difference_amount: diff, status: "open", ...base,
         });
       });
     });
     await bulk("payment_transactions", ["record_id", "branch_id", "payment_source_id", "transaction_id", "external_ref", "amount", "currency", "payer_name", "payer_phone", "payment_mode", "transaction_at", "status", "metadata", "hive_site_id", "hive_site_name"], txs);
-    await bulk("exceptions", ["record_id", "branch_id", "payment_transaction_id", "exception_type", "severity", "title", "description", "expected_amount", "actual_amount", "difference_amount", "status", "hive_site_id", "hive_site_name"], exceptions);
+    await bulk("business_events", ["record_id", "branch_id", "event_id", "event_type", "external_ref", "amount", "currency", "payment_mode", "occurred_at", "status", "metadata", "hive_site_id", "hive_site_name"], events);
+    await bulk("exceptions", ["record_id", "branch_id", "event_id", "payment_transaction_id", "exception_type", "severity", "title", "description", "expected_amount", "actual_amount", "difference_amount", "status", "hive_site_id", "hive_site_name"], exceptions);
 
     const summary = { ...analyse(rows), new_branches: newBranches.length, new_clients: newClients.length, exceptions: exceptions.length };
 

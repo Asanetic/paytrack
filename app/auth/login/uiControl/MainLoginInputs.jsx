@@ -38,10 +38,10 @@ function MainLoginInputs({
   return (
     <div className="col-md-12 py-4">
       <div className="col-md-12 py-3 text-center">
-        <img src={appLogo} alt="App Logo" style={{ width: '100px' }} />
+        <img src={appLogo} alt="App Logo" style={{ height: '100px' }} />
       </div>
 
-      <h4 className="col-md-12 mb-3 text-center">{appName}</h4>
+      <h4 className="col-md-12 mb-3 text-center d-none">{appName}</h4>
       <p className="account-subtitle text-center">Login to proceed</p>
 
       <form onSubmit={sendLoginRequest} encType="multipart/form-data" id="mosy_form">

@@ -7,20 +7,22 @@ import { getApiRoutes } from "../AppRoutes/apiRoutesHandler";
 const endpoint = getApiRoutes().payments.importTransactions;
 const MAX_BYTES = 10 * 1024 * 1024;
 
-const HEADERS = ["transaction_id", "transaction_date", "branch", "payment_mode", "amount", "currency", "payer_name", "payer_phone", "reference", "expected_amount", "status"];
+const HEADERS = ["type", "transaction_id", "transaction_date", "channel", "payment_mode", "amount", "currency", "payer_name", "payer_phone", "reference", "expected_amount", "status"];
 const SAMPLE = [
-  ["TX-9001", "2026-11-01 09:20:00", "Nairobi CBD", "mpesa", 5000, "KES", "Jane Wanjiku", "0711000001", "INV-1001", 5000, "completed"],
-  ["TX-9002", "2026-11-01 11:00:00", "Nairobi CBD", "bank", 11500, "KES", "Peter Otieno", "0722000002", "INV-1002", 12000, "completed"],
+  ["money_in", "TX-9001", "2026-11-01 09:20:00", "Nairobi CBD", "mpesa", 5000, "KES", "Jane Wanjiku", "0711000001", "INV-1001", 5000, "completed"],
+  ["money_in", "TX-9002", "2026-11-01 11:00:00", "Nairobi CBD", "bank", 11500, "KES", "Peter Otieno", "0722000002", "INV-1002", 12000, "completed"],
+  ["money_out", "OUT-5001", "2026-11-02 15:00:00", "Nairobi CBD", "bank", 3000, "KES", "Office Supplies Ltd", "0733000009", "PO-221", 3000, "completed"],
 ];
 const GUIDE = [
   ["Column", "Required", "Notes"],
+  ["type", "No", "money_in (default) or money_out. Money out is saved as a Money Out business event"],
   ["transaction_id", "Yes", "Unique per payment; duplicates are skipped on re-upload"],
   ["transaction_date", "Yes", "YYYY-MM-DD HH:MM:SS"],
-  ["branch", "Yes", "Branch name; created automatically if new"],
+  ["channel", "Yes", "Channel name; created automatically if new"],
   ["payment_mode", "Yes", "mpesa / cash / card / bank"],
   ["amount", "Yes", "Plain number"],
   ["currency", "No", "Default KES"],
-  ["payer_name / payer_phone", "No", "Client is created or linked automatically"],
+  ["payer_name / payer_phone", "No", "Money in: client created/linked. Money out: payee name/phone"],
   ["reference", "No", "Invoice / receipt ref; same ref + amount twice = possible duplicate"],
   ["expected_amount", "No", "Difference is flagged as underpaid / overpaid"],
   ["status", "No", "Default completed"],
@@ -42,7 +44,7 @@ function downloadTemplate() {
 }
 
 const Pill = ({ tone = "", children }) => <span className={`imp-pill ${tone}`}>{children}</span>;
-const PILL_TONE = { valid: "", error: "red", duplicate: "muted", underpaid: "amber", overpaid: "blue", possible_duplicate: "amber", unverified: "muted" };
+const PILL_TONE = { in: "", out: "red", valid: "", error: "red", duplicate: "muted", underpaid: "amber", overpaid: "blue", possible_duplicate: "amber", unverified: "muted" };
 
 function Stat({ label: l, value, tone = "" }) {
   return (
@@ -54,14 +56,15 @@ function Stat({ label: l, value, tone = "" }) {
 }
 
 function Breakdown({ title, items }) {
-  const max = Math.max(...items.map((i) => i.total), 1);
+  const max = Math.max(...items.map((i) => Math.abs(i.total)), 1);
   return (
     <div className="imp-card imp-bd">
       <div className="imp-bd-t">{title}</div>
       {items.slice(0, 6).map((i) => (
         <div key={i.key} className="imp-bd-row">
-          <div className="imp-bd-top"><span>{i.key}</span><span>{money(i.total)}</span></div>
-          <div className="imp-bar"><i style={{ width: `${(i.total / max) * 100}%` }} /></div>
+          <div className="imp-bd-top"><span>{i.key}</span><span className={i.total < 0 ? "red" : ""}>{money(i.total)}</span></div>
+          <div className="imp-bd-sub"><span className="green">+{money(i.in)}</span><span className="red">-{money(i.out)}</span></div>
+          <div className="imp-bar"><i style={{ width: `${(Math.abs(i.total) / max) * 100}%`, background: i.total < 0 ? "#dc2626" : undefined }} /></div>
         </div>
       ))}
       {!items.length && <div className="imp-empty">No data</div>}
@@ -77,11 +80,13 @@ function Summary({ s }) {
         <Stat label="Ready to import" value={s.valid} tone="green" />
         <Stat label="Errors" value={s.errors} tone={s.errors ? "red" : ""} />
         <Stat label="Duplicates skipped" value={s.duplicates} />
-        <Stat label="Underpaid / overpaid" value={`${s.underpaid} / ${s.overpaid}`} tone={s.underpaid + s.overpaid ? "amber" : ""} />
-        <Stat label="Total amount" value={money(s.total_amount)} />
+        <Stat label="Flagged (under/over/dup)" value={s.underpaid + s.overpaid + s.possible_duplicates} tone={s.underpaid + s.overpaid + s.possible_duplicates ? "amber" : ""} />
+        <Stat label={`Money in (${s.count_in})`} value={money(s.money_in)} tone="green" />
+        <Stat label={`Money out (${s.count_out})`} value={money(s.money_out)} tone={s.money_out ? "red" : ""} />
+        <Stat label="Net" value={money(s.net)} tone={s.net < 0 ? "red" : "green"} />
       </div>
       <div className="imp-bds">
-        <Breakdown title="By branch" items={s.by_branch} />
+        <Breakdown title="By channel" items={s.by_branch} />
         <Breakdown title="By payment mode" items={s.by_mode} />
         <Breakdown title="By day" items={s.by_day} />
       </div>
@@ -103,13 +108,14 @@ export default function TransactionImporter({ title = "Import Transactions", sub
   const [perPage, setPerPage] = useState(10);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
 
   const validated = !!preview;
   const s = preview?.summary;
 
   function resetParsed() {
     setRawRows([]); setPreview(null); setResult(null); setStatus("idle");
-    setQ(""); setFilter("all"); setPage(1);
+    setQ(""); setFilter("all"); setTypeFilter("all"); setPage(1);
   }
 
   function selectFile(f) {
@@ -158,14 +164,15 @@ export default function TransactionImporter({ title = "Import Transactions", sub
     const term = q.trim().toLowerCase();
     return preview.rows.filter((r) => {
       if (filter === "flagged" ? !(r.state === "valid" && r.flags.some((f) => f !== "unverified")) : filter !== "all" && r.state !== filter) return false;
+      if (typeFilter !== "all" && r.direction !== typeFilter) return false;
       return !term || [r.transaction_id, r.branch, r.payment_mode, r.payer_name, r.reference].some((v) => String(v ?? "").toLowerCase().includes(term));
     });
-  }, [preview, q, filter]);
+  }, [preview, q, filter, typeFilter]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / perPage));
   const start = (page - 1) * perPage;
   const shown = rows.slice(start, start + perPage);
-  const isFiltered = q !== "" || filter !== "all";
+  const isFiltered = q !== "" || filter !== "all" || typeFilter !== "all";
 
   function pageButtons() {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -210,9 +217,7 @@ export default function TransactionImporter({ title = "Import Transactions", sub
         .imp-alert.err { background: #fdecee; border: 1px solid #f5c2c7; color: #7f1d1d; } .imp-alert.err .ico { background: #dc2626; }
         .imp-alert.warn { background: #fff7e6; border: 1px solid #fde1a6; color: #7a4b00; } .imp-alert.warn .ico { background: #d97706; }
         .imp-alert.ok { background: #e8f5ee; border: 1px solid #b7e1c7; color: #14532d; } .imp-alert.ok .ico { background: var(--g); }
-        .imp-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 14px; }
-        @media (max-width: 992px) { .imp-stats { grid-template-columns: repeat(3, 1fr); } }
-        @media (max-width: 520px) { .imp-stats { grid-template-columns: repeat(2, 1fr); } }
+        .imp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
         .imp-stat { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; }
         .imp-stat-v { font-size: 1.3rem; font-weight: 700; } .imp-stat-l { font-size: .75rem; color: #6b7280; }
         .green { color: var(--g); } .red { color: #dc2626; } .amber { color: #b45309; }
@@ -220,6 +225,7 @@ export default function TransactionImporter({ title = "Import Transactions", sub
         @media (max-width: 992px) { .imp-bds { grid-template-columns: 1fr; } }
         .imp-bd-t { font-weight: 700; font-size: .9rem; margin-bottom: 10px; }
         .imp-bd-row { margin-bottom: 9px; } .imp-bd-top { display: flex; justify-content: space-between; font-size: .8rem; margin-bottom: 3px; }
+        .imp-bd-sub { display: flex; justify-content: space-between; font-size: .7rem; margin-bottom: 3px; }
         .imp-bar { height: 6px; background: #eef2f7; border-radius: 99px; overflow: hidden; } .imp-bar i { display: block; height: 100%; background: var(--g); border-radius: 99px; }
         .imp-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
         .imp-head h5 { margin: 0; font-weight: 700; font-size: 1.05rem; }
@@ -317,8 +323,8 @@ export default function TransactionImporter({ title = "Import Transactions", sub
         <div className="imp-alert ok">
           <span className="ico"><i className="fa fa-check"></i></span>
           <span>
-            Imported <strong>{result.summary.valid}</strong> transactions
-            {result.summary.new_branches > 0 && `, ${result.summary.new_branches} new branch(es)`}
+            Imported <strong>{result.summary.count_in}</strong> money in and <strong>{result.summary.count_out}</strong> money out
+            {result.summary.new_branches > 0 && `, ${result.summary.new_branches} new channel(s)`}
             {result.summary.new_clients > 0 && `, ${result.summary.new_clients} new client(s)`}
             {`, ${result.exceptions.length} exception(s) raised.`}
           </span>
@@ -366,26 +372,32 @@ export default function TransactionImporter({ title = "Import Transactions", sub
                 <option value="error">Errors ({s.errors})</option>
                 <option value="duplicate">Duplicates ({s.duplicates})</option>
               </select>
+              <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}>
+                <option value="all">In &amp; out</option>
+                <option value="in">Money in</option>
+                <option value="out">Money out</option>
+              </select>
               <label>
                 Rows per page:
                 <select value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}>
                   {[5, 10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
               </label>
-              {isFiltered && <button className="imp-btn" style={{ padding: "5px 10px" }} onClick={() => { setQ(""); setFilter("all"); setPage(1); }}>Reset</button>}
+              {isFiltered && <button className="imp-btn" style={{ padding: "5px 10px" }} onClick={() => { setQ(""); setFilter("all"); setTypeFilter("all"); setPage(1); }}>Reset</button>}
             </div>
           </div>
 
           <div className="table-responsive">
             <table className="imp-table">
               <thead>
-                <tr><th>#</th><th>Transaction ID</th><th>Date</th><th>Branch</th><th>Mode</th><th>Payer</th><th>Reference</th><th className="num">Amount</th><th className="num">Expected</th><th>Status</th></tr>
+                <tr><th>#</th><th>Type</th><th>Transaction ID</th><th>Date</th><th>Channel</th><th>Mode</th><th>Payer / Payee</th><th>Reference</th><th className="num">Amount</th><th className="num">Expected</th><th>Status</th></tr>
               </thead>
               <tbody>
-                {!shown.length && <tr><td colSpan={10}><div className="imp-empty">No rows match your search.</div></td></tr>}
+                {!shown.length && <tr><td colSpan={11}><div className="imp-empty">No rows match your search.</div></td></tr>}
                 {shown.map((r) => (
                   <tr key={r.line} className={r.state === "error" ? "bad" : ""}>
                     <td>{r.line - 1}</td>
+                    <td>{r.direction ? <Pill tone={PILL_TONE[r.direction]}>{r.direction === "in" ? "Money in" : "Money out"}</Pill> : "-"}</td>
                     <td>{r.transaction_id || "-"}</td>
                     <td>{r.transaction_at || "-"}</td>
                     <td>{r.branch || "-"}</td>

@@ -83,7 +83,7 @@ export const MoneyflowSchema = {
     { key: 'view', label: 'View more', icon: 'edit', rowAction: false },
     { key: 'new', label: 'New Payment', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/payments/profile', grid: false, form: false, rowAction: false },
     { key: 'clone', label: 'Clone Record', icon: 'copy', variant: 'outline-secondary', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_payments' },
-    { key: 'filter_by_branch', label: 'Filter by branch', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_branch', label: 'Filter by channel', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_mode', label: 'Filter by mode', icon: 'credit-card', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_date', label: 'Filter by date', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
   ],

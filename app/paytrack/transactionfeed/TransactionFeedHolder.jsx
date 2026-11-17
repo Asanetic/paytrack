@@ -79,7 +79,7 @@ export default function TransactionFeedHolder() {
       ]}
       filters={[
         { key: 'date', label: 'Date', icon: 'calendar', type: 'date' },
-        { key: 'branch', label: 'Branch', icon: 'building-o', options: opts('All branches', [['juja', 'Juja'], ['ruiru', 'Ruiru']]) },
+        { key: 'branch', label: 'Channel', icon: 'building-o', options: opts('All branches', [['juja', 'Juja'], ['ruiru', 'Ruiru']]) },
         { key: 'method', label: 'Payment method', icon: 'credit-card', options: opts('All payment methods', [['mpesa', 'M-Pesa'], ['card', 'Card'], ['bank', 'Bank Transfer'], ['cash', 'Cash']]) },
         { key: 'status', label: 'Status', icon: 'tag', options: opts('All statuses', [['matched', 'Matched'], ['waiting', 'Waiting'], ['unmatched', 'Unmatched']]) },
         { key: 'sort', label: 'Sort', icon: 'sliders', options: [{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'amount_desc', label: 'Highest amount' }] },

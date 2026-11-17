@@ -98,18 +98,18 @@ export const sidebarConfig = [
 
       {
         label: "Money Out",
-        href: (routes) => `${routes.paytrack}/events/list`,
+        href: (routes) => `${routes.paytrack}/events/out`,
         roles: []
       },
 
       {
-        label: "By Payment Channel",
+        label: "By Payment Mode",
         href: (routes) => `${routes.paytrack}/moneyflow/bymethod`,
         roles: []
       },
 
       {
-        label: "By Branch",
+        label: "By Channel",
         href: (routes) => `${routes.paytrack}/moneyflow/bybranch`,
         roles: []
       },
@@ -117,6 +117,12 @@ export const sidebarConfig = [
       {
         label: "Daily Summary",
         href: (routes) => `${routes.paytrack}/moneyflow/daily`,
+        roles: []
+      },
+
+      {
+        label: "Import Transactions",
+        href: (routes) => `${routes.paytrack}/payments/import`,
         roles: []
       }
 
@@ -331,13 +337,13 @@ export const sidebarConfig = [
       // },
 
       {
-        label: "By Payment Channel",
+        label: "By Payment Mode",
         href: (routes) => `${routes.paytrack}/moneyflow/bymethod`,
         roles: []
       },
 
       {
-        label: "By Branch",
+        label: "By Channel",
         href: (routes) => `${routes.paytrack}/moneyflow/bybranch`,
         roles: []
       },
@@ -383,13 +389,13 @@ export const sidebarConfig = [
       // -----------------------------------------------------
 
       {
-        label: "Branches",
+        label: "Channels",
         href: (routes) => `${routes.paytrack}/branches/list`,
         roles: []
       },
 
       // -----------------------------------------------------
-      // PAYMENT CHANNELS
+      // PAYMENT MODES
       // -----------------------------------------------------
       //
       // M-Pesa
@@ -402,7 +408,7 @@ export const sidebarConfig = [
       //
 
       // {
-      //   label: "Payment Channels",
+      //   label: "Payment Modes",
       //   href: (routes) => `${routes.paytrack}/paymentmethods/list`,
       //   roles: []
       // },

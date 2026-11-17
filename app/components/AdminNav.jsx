@@ -143,15 +143,15 @@ export default function NavSidebar({
           <a className="mobile_btn cpointer" id="mobile_btn"><i className="fa fa-bars" /></a>
           <span id="toggle_btn" className="cpointer"><i className="fe fe-text-align-left" /></span>
           <Link href={indexPage} className="logo logo-small text-dark" style={{ marginLeft: '-100px' }}>
-            <Image src={appLogo} alt="Logo" style={appLogoStyle} width={30} height={30} />
-            <span className="bold h5">{appName}</span>
+            <Image src={appLogo} alt="Logo" style={appLogoStyle} width={1050} height={327} unoptimized priority />
+            <span className="bold h5 d-none">{appName}</span>
           </Link>
         </div>
 
         <div className="top-nav-search pt-2">
           <Link href={indexPage} className="logo text-dark">
-            <Image src={appLogo} alt="Logo" style={appLogoStyle} width={30} height={30} />
-            <span className="bold h5">{appName}</span>
+            <Image src={appLogo} alt="Logo" style={appLogoStyle} width={1050} height={327} unoptimized priority />
+            <span className="bold h5 d-none ">{appName}</span>
           </Link>
         </div>
 

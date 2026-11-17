@@ -17,7 +17,7 @@ const moduleApi = apiRoutes.branches.base;
 export const BranchesSchema = {
   entity: 'branches',              // DB table name; also drives default role names
                                      // (view_branches / manage_branches) and apiBase
-  label: 'Branches',                 // optional, defaults to entity capitalized
+  label: 'Channels',                 // optional, defaults to entity capitalized
   apiBase: moduleApi,
 
   //api endpint for importing data from csv
@@ -80,7 +80,7 @@ export const BranchesSchema = {
     { key: 'save', label: 'Save', icon: 'save', variant: 'primary', grid: false, form: true, rowAction: false },
     { key: 'delete', label: 'Delete', icon: 'trash', variant: 'outline-danger', confirm: 'Are you sure you want to delete this branche?', editOnly: true, grid: false, form: true, rowAction: true, role: 'manage_branches' },
     { key: 'view', label: 'View more', icon: 'edit', rowAction: true },
-    { key: 'new', label: 'New Branche', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/branches/profile', grid: true, form: false, rowAction: false },
+    { key: 'new', label: 'New Channel', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/branches/profile', grid: true, form: false, rowAction: false },
     { key: 'clone', label: 'Clone Record', icon: 'copy', variant: 'outline-secondary', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_branches' },
     //{ key: 'filterByDate', label: 'Filter by date', icon: 'calendar', variant: 'outline-primary', type: 'action', grid: true, form: false, rowAction: false },
   ],
@@ -114,8 +114,8 @@ export const BranchesSchema = {
     // key: DB column name | label: shown on screen | type: drives input + SQL type
     { key: 'primkey', label: 'Primkey', type: 'number', system: true, editable: false },
     { key: 'record_id', label: 'Record Id', type: 'text', system: true, editable: false },
-    { key: 'branch_code', label: 'Branch Code', type: 'text', title: true },
-    { key: 'branch_name', label: 'Branch Name', type: 'text', title: true, required: true },
+    { key: 'branch_code', label: 'Channel Code', type: 'text', title: true },
+    { key: 'branch_name', label: 'Channel Name', type: 'text', title: true, required: true },
     { key: 'location', label: 'Location', type: 'text' },
     { key: 'phone', label: 'Phone', type: 'text' },
     { key: 'status', label: 'Status', type: 'groupedSelect', endpoint: moduleApi, groupByField: 'status' },

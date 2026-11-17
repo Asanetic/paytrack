@@ -38,7 +38,7 @@ export const globalRelations = {
     valueField: "record_id",
     displayField: "branch_name",
     cacheField: "branch_name",
-    label: "Branch",
+    label: "Channel",
     // used by: business_events, exceptions, integrations, payment_transactions, users
   },
 

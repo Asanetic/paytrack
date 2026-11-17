@@ -228,7 +228,7 @@ export async function POST(request) {
         transaction_code: transactionCode,
         currency,
         amount_paid: amountPaid,
-        payment_description: `POS sale — ${branchName || merchant.merchant_name || "Branch"}`,
+        payment_description: `POS sale — ${branchName || merchant.merchant_name || "Channel"}`,
         payment_notes: JSON.stringify(safeDetails),
         payment_date: trx_date,
         payment_status: "Completed",

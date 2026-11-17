@@ -82,7 +82,7 @@ export const PaymentsSchema = {
     { key: 'view', label: 'View more', icon: 'edit', rowAction: true },
     { key: 'new', label: 'New Payment', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/payments/profile', grid: true, form: false, rowAction: false },
     { key: 'clone', label: 'Clone Record', icon: 'copy', variant: 'outline-secondary', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_payments' },
-    { key: 'filter_by_branch', label: 'Filter by branch', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_branch', label: 'Filter by channel', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_mode', label: 'Filter by mode', icon: 'credit-card', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_date', label: 'Filter by date', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
   ],
@@ -117,7 +117,7 @@ export const PaymentsSchema = {
     // key: DB column name | label: shown on screen | type: drives input + SQL type
     { key: 'primkey', label: 'Primkey', type: 'number', system: true, editable: false },
     { key: 'record_id', label: 'Record Id', type: 'text', system: true, editable: false },
-    { key: 'branch_id', label: 'Branch Id', type: 'text' },
+    { key: 'branch_id', label: 'Channel Id', type: 'text' },
     { key: 'payment_source_id', label: 'Payment Source Id', type: 'text' },
     { key: 'transaction_id', label: 'Transaction Id', type: 'text' },
     { key: 'external_ref', label: 'External Ref', type: 'text' },

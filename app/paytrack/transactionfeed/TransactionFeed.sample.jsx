@@ -87,7 +87,7 @@ export default function TransactionFeedPage() {
       ]}
       filters={[
         { key: 'date', label: 'Date', icon: 'calendar', type: 'date', value: '2026-09-27' },
-        { key: 'branch', label: 'Branch', icon: 'building-o', options: opts('All branches', [['juja', 'Juja'], ['ruiru', 'Ruiru']]) },
+        { key: 'branch', label: 'Channel', icon: 'building-o', options: opts('All branches', [['juja', 'Juja'], ['ruiru', 'Ruiru']]) },
         { key: 'method', label: 'Payment method', icon: 'credit-card', options: opts('All payment methods', [['mpesa', 'M-Pesa'], ['card', 'Card'], ['bank', 'Bank Transfer'], ['cash', 'Cash']]) },
         { key: 'status', label: 'Status', icon: 'tag', options: opts('All statuses', [['matched', 'Matched'], ['waiting', 'Waiting'], ['unmatched', 'Unmatched']]) },
         { key: 'source', label: 'Source', icon: 'users', options: opts('All sources', [['mpesa_monitor', 'M-Pesa Monitor'], ['pos', 'POS'], ['manual', 'Manual']]) },

@@ -24,8 +24,8 @@ const paymentStats = (g) => {
   return [
     { key: 'amount', label: 'Total Amount', value: kes(total), change: '+12.5%', sub: 'vs previous period', icon: 'database', tone: 'green' },
     { key: 'count', label: 'Total Transactions', value: Number(g.totalCount ?? rows.length).toLocaleString(), change: '+8.3%', sub: 'vs previous period', icon: 'exchange', tone: 'blue' },
-    { key: 'branches', label: 'Active Branches', value: branches.size, sub: 'on this page', icon: 'building-o', tone: 'purple' },
-    { key: 'channels', label: 'Payment Channels', value: channels.length, sub: channels.join(', '), icon: 'credit-card', tone: 'amber' },
+    { key: 'branches', label: 'Active Channels', value: branches.size, sub: 'on this page', icon: 'building-o', tone: 'purple' },
+    { key: 'channels', label: 'Payment Modes', value: channels.length, sub: channels.join(', '), icon: 'credit-card', tone: 'amber' },
   ];
 };
 
@@ -33,8 +33,8 @@ const paymentBreakdowns = (g) => {
   const rows = g.rows || [];
   const total = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
   return [
-    { key: 'channel', title: 'Amount by Payment Channel', type: 'donut', centerLabel: 'KES', centerValue: kesShort(total), items: groupSum(rows, 'channel') },
-    { key: 'branch', title: 'Amount by Branch', type: 'bars', items: groupSum(rows, 'branch') },
+    { key: 'channel', title: 'Amount by Payment Mode', type: 'donut', centerLabel: 'KES', centerValue: kesShort(total), items: groupSum(rows, 'channel') },
+    { key: 'branch', title: 'Amount by Channel', type: 'bars', items: groupSum(rows, 'branch') },
   ];
 };
 

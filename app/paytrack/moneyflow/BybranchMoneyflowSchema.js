@@ -17,7 +17,7 @@ const moduleApi = apiRoutes.bybranchmoneyflow.base;
 export const BybranchMoneyflowSchema = {
   entity: 'payment_transactions',              // DB table name; also drives default role names
                                      // (view_moneyflow / manage_moneyflow) and apiBase
-  label: 'Payment by branch',                 // optional, defaults to entity capitalized
+  label: 'Payment by channel',                 // optional, defaults to entity capitalized
   apiBase: moduleApi,
 
   //api endpint for importing data from csv
@@ -82,7 +82,7 @@ export const BybranchMoneyflowSchema = {
     { key: 'view', label: 'View more', icon: 'edit', rowAction: false },
     { key: 'new', label: 'New Moneyflow', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/moneyflow/profile', grid: false, form: false, rowAction: false },
     { key: 'clone', label: 'Clone Record', icon: 'copy', variant: 'outline-secondary', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_moneyflow' },
-    { key: 'filter_by_branch', label: 'Filter by branch', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_branch', label: 'Filter by channel', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_mode', label: 'Filter by mode', icon: 'credit-card', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_date', label: 'Filter by date', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_today', label: 'Today', icon: 'calendar', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
@@ -122,7 +122,7 @@ export const BybranchMoneyflowSchema = {
     { key: 'primkey', label: 'Primkey', type: 'number', system: true, editable: false },
     { key: 'record_id', label: 'Record Id', type: 'text', system: true, editable: false },
     { key: 'period', label: 'Date', type: 'text', computed: true, editable: false, title: true },
-    { key: 'branch_name', label: 'Branch', type: 'text', computed: true, editable: false },
+    { key: 'branch_name', label: 'Channel', type: 'text', computed: true, editable: false },
     { key: 'payment_mode', label: 'Mode', type: 'text', computed: true, editable: false },
     { key: 'total', label: 'Total', type: 'money', computed: true, editable: false, sum: true, decimals: 2 },
     { key: 'count', label: 'Count', type: 'number', computed: true, editable: false, sum: true },

@@ -123,7 +123,7 @@ export const SmartpaymentsSchema = {
     { key: 'payer_phone', label: 'Payer Phone', type: 'text' },
     { key: 'payer_email', label: 'Payer Email', type: 'text' },
     { key: 'payment_method', label: 'Payment Method', type: 'text' },
-    { key: 'payment_channel', label: 'Payment Channel', type: 'text' },
+    { key: 'payment_channel', label: 'Payment Mode', type: 'text' },
     { key: 'transaction_code', label: 'Transaction Code', type: 'text', title: true },
     { key: 'currency', label: 'Currency', type: 'text' },
     { key: 'amount_paid', label: 'Amount Paid', type: 'money' },

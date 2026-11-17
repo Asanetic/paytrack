@@ -51,12 +51,12 @@ export const sidebarConfig = [
   // Branches
   // {
   //   type: "submenu",
-  //   label: "Branches",
+  //   label: "Channels",
   //   icon: "fa fa-building",
   //   roles: [],
   //   items: [
-  //     { label: "Branch List", href: (routes) => `${routes.cms}/branches/list`, roles: [] },
-  //     { label: "Add Branch", href: (routes) => `${routes.cms}/branches/add`, roles: [] },
+  //     { label: "Channel List", href: (routes) => `${routes.cms}/branches/list`, roles: [] },
+  //     { label: "Add Channel", href: (routes) => `${routes.cms}/branches/add`, roles: [] },
   //   ],
   // },
 
@@ -120,7 +120,7 @@ export const sidebarConfig = [
     roles: [],
     items: [
       { label: "Business Profile", href: (routes) => `${routes.cms}/companies/list`, roles: [] },
-      { label: "Branches", href: (routes) => `${routes.cms}/branches/list`, roles: [] },
+      { label: "Channels", href: (routes) => `${routes.cms}/branches/list`, roles: [] },
       { label: "Sales points", href: (routes) => `${routes.cms}/salespoints/list`, roles: [] },
       { label: "System Shifts", href: (routes) => `${routes.cms}/systemshifts/list`, roles: [] },
       { label: "System users", href: (routes) => `${routes.cms}/sysusers/list`, roles: [] },

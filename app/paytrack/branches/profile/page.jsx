@@ -8,7 +8,7 @@ export async function generateMetadata({ searchParams }) {
 
   return {
     title: mosyTitle ? decodeURIComponent(mosyTitle) : `Branches Profile`,
-    description: 'Branches profile / item details',
+    description: 'Channels profile / item details',
     
     icons: {
       icon: `${hiveRoutes.hiveBaseRoute}/logo.png`

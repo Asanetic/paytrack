@@ -29,7 +29,7 @@ const PaymentsActions = {
 
   // Grid-toolbar smart filters — see actionRegistryDocs.md section 8.
   filter_by_branch: (ctx) => openSmartMapFilter(ctx, {
-    title: 'Filter by branch',
+    title: 'Filter by channel',
     searchSchema: BranchesSchema,
     displayField: 'branch_name',
     valueField: 'record_id',

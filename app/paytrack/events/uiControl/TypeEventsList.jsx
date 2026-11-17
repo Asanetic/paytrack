@@ -56,7 +56,7 @@ function eventTypeBreakdowns(g) {
     },
     {
       key: 'by_branch',
-      title: 'By Branch',
+      title: 'By Channel',
       type: 'bars',
       items: toItems(sumRowsBy(rows, (r) => r.branch_name)),
     },

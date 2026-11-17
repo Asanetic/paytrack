@@ -84,7 +84,7 @@ export const InEventsSchema = {
     { key: 'view', label: 'View more', icon: 'edit', rowAction: false },
     { key: 'new', label: 'New Event', icon: 'plus', variant: 'outline-primary', navigateTo: '/paytrack/events/profile', grid: false, form: false, rowAction: false },
     { key: 'clone', label: 'Clone Record', icon: 'copy', variant: 'outline-secondary', editOnly: true, grid: false, form: true, rowAction: false, role: 'manage_events' },
-    { key: 'filter_by_branch', label: 'Filter by branch', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
+    { key: 'filter_by_branch', label: 'Filter by channel', icon: 'building-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_type', label: 'Filter by type', icon: 'tag', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_mode', label: 'Filter by mode', icon: 'credit-card', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },
     { key: 'filter_by_remark', label: 'Filter by remark', icon: 'comment-o', variant: 'outline-secondary', type: 'action', grid: true, form: false, rowAction: false },

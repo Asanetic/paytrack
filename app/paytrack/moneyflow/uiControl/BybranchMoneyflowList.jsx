@@ -48,7 +48,7 @@ function moneyflowBreakdowns(g) {
   return [
     {
       key: 'by_branch',
-      title: 'By Branch',
+      title: 'By Channel',
       type: 'donut',
       centerLabel: 'Total',
       centerValue: money(rows.reduce((s, r) => s + (Number(r.total) || 0), 0)),

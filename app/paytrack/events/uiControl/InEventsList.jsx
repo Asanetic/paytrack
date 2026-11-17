@@ -8,7 +8,7 @@ import EventsActions from '../logicControl/actionsRegistry';
 //   return <SmartGrid moduleActions={EventsActions} schema={InEventsSchema} title="Events" />;
 // }PaidInvoicesSchema.label
 export default function InEventsList({
-  fixedQuery = {},
+  fixedQuery = { eventType: btoa('Money In') },   // only Money In events
   dataOut = {},
   title = InEventsSchema.label,
   description = `${InEventsSchema.label} list`,
