@@ -136,13 +136,17 @@ export default function PayDashboardHolder() {
           key: a.record_id,
           title: a.title,
           subtitle: a.type === 'missing_cash'
-            ? `${new Date(a.day).toLocaleDateString()} · ${a.count} other payment${a.count === 1 ? '' : 's'}, KES ${Number(a.amount).toLocaleString()} — no cash logged`
-            : a.payment_ref,
+            ? `${a.count} non-cash payment${a.count === 1 ? '' : 's'} (KES ${Number(a.amount).toLocaleString()}) but no cash. If the till took cash, record it.`
+            : [a.payment_ref, a.detail].filter(Boolean).join(' · '),
           icon: a.type === 'missing_cash' ? 'money' : 'exclamation-triangle',
           tone: a.type === 'missing_cash' ? 'red' : (a.severity === 'high' ? 'red' : a.severity === 'low' ? 'gray' : 'amber'),
-          amount: fmtMoney(a.amount),
+          amount: a.type === 'missing_cash' ? fmtMoney(a.amount) : `${a.amount > 0 ? '+' : ''}${fmtMoney(a.amount)}`,
           time: a.type === 'missing_cash' ? new Date(a.day).toLocaleDateString() : fmtAgo(a.at),
-          onClick: a.type === 'missing_cash' ? () => showCdmWaitModal(a.day) : go('/paytrack/payments/profile'),
+          onClick: a.type === 'missing_cash'
+            ? () => showCdmWaitModal(a.day)
+            : a.target
+              ? go(`${hiveRoutes.paytrack}/${a.target.path}/profile?${a.target.entity}_dataNode=${window.btoa(String(a.target.primkey))}`)
+              : go(`${hiveRoutes.paytrack}/moneyflow/list`),
         })),
       }}
     >

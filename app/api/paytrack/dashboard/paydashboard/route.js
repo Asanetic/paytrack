@@ -69,7 +69,7 @@ export async function GET(request) {
       return localDateStr(d);
     })();
 
-    const [[heroRows], [attentionCountRows], [methodRows], [recentRows], [exceptionRows], [dayTotalsRows], [monthlyRows]] = await Promise.all([
+    const [[heroRows], [attentionCountRows], [methodRows], [recentRows], [exceptionRows], [dayTotalsRows], [monthlyRows], [cashHistoryRows]] = await Promise.all([
       conn.execute(
         `SELECT COALESCE(SUM(amount), 0) AS total_amount, COUNT(*) AS total_count
          FROM ${db}.\`payment_transactions\`
@@ -101,9 +101,11 @@ export async function GET(request) {
       conn.execute(
         `SELECT e.record_id, e.exception_type, e.title, e.severity, e.status,
                 e.expected_amount, e.actual_amount, e.difference_amount, e.created_at,
-                pt.external_ref AS payment_ref
+                COALESCE(pt.external_ref, pt.transaction_id, be.external_ref, be.event_id) AS payment_ref,
+                pt.primkey AS payment_primkey, be.primkey AS event_primkey
          FROM ${db}.\`exceptions\` e
          LEFT JOIN ${db}.\`payment_transactions\` pt ON pt.record_id = e.payment_transaction_id
+         LEFT JOIN ${db}.\`business_events\` be ON be.record_id = e.event_id
          WHERE e.hive_site_id = ? AND e.status != 'Resolved'
          ORDER BY e.created_at DESC
          LIMIT 6`,
@@ -131,6 +133,13 @@ export async function GET(request) {
          ORDER BY month ASC`,
         [hiveSiteId, `${monthsWindowStart} 00:00:00`]
       ),
+      // Is cash actually part of this business? (any cash in the last 90 days)
+      conn.execute(
+        `SELECT COUNT(*) AS cash_payments
+         FROM ${db}.\`payment_transactions\`
+         WHERE hive_site_id = ? AND payment_mode = 'Cash' AND transaction_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)`,
+        [hiveSiteId]
+      ),
     ]);
 
     const totalAmount = Number(heroRows[0]?.total_amount || 0);
@@ -138,7 +147,14 @@ export async function GET(request) {
     const exceptionCount = Number(attentionCountRows[0]?.attention_count || 0);
 
     const daysWithActivity = dayTotalsRows.length;
-    const missingCashDayRows = dayTotalsRows.filter((r) => Number(r.cash_count || 0) === 0);
+    // "No cash" is only a real signal when (a) cash is normally used by this
+    // business and (b) the day is over. Otherwise it's a false alarm.
+    const usesCash = Number(cashHistoryRows[0]?.cash_payments || 0) > 0;
+    const todayKey = new Date().toLocaleDateString("sv-SE", { timeZone: "Africa/Nairobi" });
+    const dayKey = (d) => (d instanceof Date ? d.toLocaleDateString("sv-SE") : String(d).slice(0, 10));
+    const missingCashDayRows = usesCash
+      ? dayTotalsRows.filter((r) => Number(r.cash_count || 0) === 0 && dayKey(r.day) !== todayKey)
+      : [];
     const daysMissingCash = missingCashDayRows.length;
     const daysCashVerified = daysWithActivity - daysMissingCash;
     const attentionCount = exceptionCount + daysMissingCash;
@@ -160,20 +176,47 @@ export async function GET(request) {
       transaction_at: r.transaction_at,
     }));
 
-    const exceptionItems = exceptionRows.map((r) => ({
-      record_id: r.record_id,
-      type: "exception",
-      title: r.title || r.exception_type || "Exception",
-      severity: r.severity || "medium",
-      amount: Number(r.difference_amount ?? r.expected_amount ?? 0),
-      payment_ref: r.payment_ref,
-      at: r.created_at,
-    }));
+    const kes = (n) => Number(n || 0).toLocaleString("en-KE", { maximumFractionDigits: 2 });
+    const EXCEPTION_COPY = {
+      underpaid: (r) => ({
+        title: `Paid KES ${kes(Math.abs(r.difference_amount))} less than expected`,
+        detail: `Expected KES ${kes(r.expected_amount)}, received KES ${kes(r.actual_amount)}`,
+      }),
+      overpaid: (r) => ({
+        title: `Paid KES ${kes(Math.abs(r.difference_amount))} more than expected`,
+        detail: `Expected KES ${kes(r.expected_amount)}, received KES ${kes(r.actual_amount)}`,
+      }),
+      possible_duplicate: (r) => ({
+        title: "Possible duplicate payment",
+        detail: `Same reference and amount (KES ${kes(r.actual_amount)}) appears more than once`,
+      }),
+    };
+
+    const exceptionItems = exceptionRows.map((r) => {
+      const copy = EXCEPTION_COPY[r.exception_type]?.(r);
+      const isEvent = !r.payment_primkey && r.event_primkey;
+      return {
+        record_id: r.record_id,
+        type: "exception",
+        exception_type: r.exception_type,
+        title: copy?.title || r.title || r.exception_type || "Exception",
+        detail: copy?.detail || "",
+        severity: r.severity || "medium",
+        amount: Number(r.difference_amount ?? r.expected_amount ?? 0),
+        payment_ref: r.payment_ref,
+        target: r.payment_primkey
+          ? { path: "payments", entity: "payment_transactions", primkey: r.payment_primkey }
+          : isEvent
+            ? { path: "events/out", entity: "business_events", primkey: r.event_primkey }
+            : null,
+        at: r.created_at,
+      };
+    });
 
     const missingCashItems = missingCashDayRows.map((r) => ({
       record_id: `nocash-${r.day}`,
       type: "missing_cash",
-      title: "No cash logged — log till/CDM cash for this day",
+      title: "No cash recorded on this day",
       severity: "high",
       amount: Number(r.total || 0),
       count: Number(r.count || 0),

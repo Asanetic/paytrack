@@ -84,6 +84,8 @@ function Summary({ s }) {
         <Stat label={`Money in (${s.count_in})`} value={money(s.money_in)} tone="green" />
         <Stat label={`Money out (${s.count_out})`} value={money(s.money_out)} tone={s.money_out ? "red" : ""} />
         <Stat label="Net" value={money(s.net)} tone={s.net < 0 ? "red" : "green"} />
+        <Stat label="Charges" value={money(s.total_charges)} tone="amber" />
+        <Stat label="Disbursed" value={money(s.total_disbursed)} tone="green" />
       </div>
       <div className="imp-bds">
         <Breakdown title="By channel" items={s.by_branch} />
@@ -103,6 +105,7 @@ export default function TransactionImporter({ title = "Import Transactions", sub
   const [result, setResult] = useState(null);
   const [status, setStatus] = useState("idle"); // idle | validating | uploading | done
   const [dragOver, setDragOver] = useState(false);
+  const [fillMsg, setFillMsg] = useState("");
 
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
@@ -144,6 +147,17 @@ export default function TransactionImporter({ title = "Import Transactions", sub
       setRawRows(rows); setPreview(res); setPage(1); setStatus("idle");
     } catch (e) {
       setFileError(e.message); setStatus("idle");
+    }
+  }
+
+  async function handleFillRates() {
+    setFillMsg("Filling rates...");
+    try {
+      const res = await mosyPostData({ url: endpoint, data: { mode: "backfill" } });
+      if (res.status !== "success") throw new Error(res.message || "Failed");
+      setFillMsg(`Done: ${res.updated} existing transaction(s) updated with channel rates.`);
+    } catch (e) {
+      setFillMsg(`Failed: ${e.message}`);
     }
   }
 
@@ -303,6 +317,11 @@ export default function TransactionImporter({ title = "Import Transactions", sub
               <button className="imp-btn" onClick={downloadTemplate}><i className="fa fa-download"></i> Download template</button>
               <button className="imp-btn" onClick={handleClear} disabled={busy}><i className="fa fa-trash-o"></i> Clear</button>
             </div>
+            <div className="imp-hint" style={{ marginTop: 0 }}>
+              Rates come from each channel (mode rate, else channel default).{" "}
+              <a style={{ color: "var(--g)", fontWeight: 600, cursor: "pointer" }} onClick={handleFillRates}>Fill rates on existing transactions</a>
+              {fillMsg && <div>{fillMsg}</div>}
+            </div>
           </div>
         </div>
       </div>
@@ -390,10 +409,10 @@ export default function TransactionImporter({ title = "Import Transactions", sub
           <div className="table-responsive">
             <table className="imp-table">
               <thead>
-                <tr><th>#</th><th>Type</th><th>Transaction ID</th><th>Date</th><th>Channel</th><th>Mode</th><th>Payer / Payee</th><th>Reference</th><th className="num">Amount</th><th className="num">Expected</th><th>Status</th></tr>
+                <tr><th>#</th><th>Type</th><th>Transaction ID</th><th>Date</th><th>Channel</th><th>Mode</th><th>Payer / Payee</th><th>Reference</th><th className="num">Amount</th><th className="num">Rate %</th><th className="num">Charges</th><th className="num">Disbursed</th><th className="num">Expected</th><th>Status</th></tr>
               </thead>
               <tbody>
-                {!shown.length && <tr><td colSpan={11}><div className="imp-empty">No rows match your search.</div></td></tr>}
+                {!shown.length && <tr><td colSpan={14}><div className="imp-empty">No rows match your search.</div></td></tr>}
                 {shown.map((r) => (
                   <tr key={r.line} className={r.state === "error" ? "bad" : ""}>
                     <td>{r.line - 1}</td>
@@ -405,6 +424,9 @@ export default function TransactionImporter({ title = "Import Transactions", sub
                     <td>{r.payer_name || "-"}</td>
                     <td>{r.reference || "-"}</td>
                     <td className="num">{r.amount === null ? "-" : money(r.amount)}</td>
+                    <td className="num">{r.rate === null ? "-" : r.rate}</td>
+                    <td className="num">{r.charge === null ? "-" : money(r.charge)}</td>
+                    <td className="num">{r.disbursed === null ? "-" : money(r.disbursed)}</td>
                     <td className="num">{r.expected_amount === null ? "-" : money(r.expected_amount)}</td>
                     <td>
                       <Pill tone={PILL_TONE[r.state]}>{label(r.state)}</Pill>

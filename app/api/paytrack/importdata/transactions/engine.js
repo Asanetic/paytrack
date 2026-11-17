@@ -5,6 +5,20 @@ const T = (t) => `\`${activeDB}\`.\`${t}\``;
 const MAX_ROWS = 20000;
 const CHUNK = 500;
 
+/* ---------- channel rates (same rule as gatewayipn) ---------- */
+
+const RATE_COL = { cash: "transaction_rate_cash", card: "transaction_rate_card", mpesa: "transaction_rate_mpesa" };
+const hasVal = (v) => v !== null && v !== undefined && v !== "" && !isNaN(v);
+const round2 = (n) => Math.round(n * 100) / 100;
+
+// mode-specific channel rate -> channel default -> 0
+function resolveRate(channel, mode) {
+  const specific = channel?.[RATE_COL[mode]];
+  if (hasVal(specific)) return Number(specific);
+  if (hasVal(channel?.default_transaction_rate)) return Number(channel.default_transaction_rate);
+  return 0;
+}
+
 /* ---------- parsing / validation ---------- */
 
 const norm = (k) => String(k || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -80,6 +94,12 @@ async function classify(conn, rawRows, hive) {
     }
   }
 
+  const [chs] = await conn.query(
+    `SELECT branch_name, transaction_rate_cash, transaction_rate_card, transaction_rate_mpesa, default_transaction_rate FROM ${T("branches")} WHERE hive_site_id <=> ?`,
+    [hive.id]
+  );
+  const channels = new Map(chs.map((c) => [String(c.branch_name).toLowerCase(), c]));
+
   const seenId = new Set();
   const seenRef = new Set();
   for (const r of rows) {
@@ -93,7 +113,14 @@ async function classify(conn, rawRows, hive) {
     seenId.add(idKey);
     r.state = "valid";
 
-    if (r.expected_amount !== null && r.amount !== r.expected_amount) {
+    if (r.direction === "in") {
+      r.rate = resolveRate(channels.get(r.branch.toLowerCase()), r.payment_mode);
+      r.charge = round2(r.amount * (r.rate / 100));
+      r.disbursed = round2(r.amount - r.charge);
+    }
+
+    // ignore rounding noise: only flag a real difference (1 currency unit or more)
+    if (r.expected_amount !== null && Math.abs(r.amount - r.expected_amount) >= 1) {
       r.flags.push(r.amount < r.expected_amount ? "underpaid" : "overpaid");
     }
     if (r.reference) {
@@ -133,6 +160,8 @@ function analyse(rows) {
     duplicates: rows.filter((r) => r.state === "duplicate").length,
     money_in,
     money_out,
+    total_charges: valid.reduce((t, r) => t + (r.charge || 0), 0),
+    total_disbursed: valid.reduce((t, r) => t + (r.disbursed || 0), 0),
     net: money_in - money_out,
     count_in: valid.filter((r) => r.direction === "in").length,
     count_out: valid.filter((r) => r.direction === "out").length,
@@ -149,7 +178,7 @@ function analyse(rows) {
 const slim = (r) => ({
   line: r.line, direction: r.direction, transaction_id: r.transaction_id, transaction_at: r.transaction_at, branch: r.branch,
   payment_mode: r.payment_mode, amount: r.amount, payer_name: r.payer_name, reference: r.reference,
-  expected_amount: r.expected_amount, state: r.state, flags: r.flags, errors: r.errors,
+  expected_amount: r.expected_amount, rate: r.rate ?? null, charge: r.charge ?? null, disbursed: r.disbursed ?? null, state: r.state, flags: r.flags, errors: r.errors,
 });
 
 /* ---------- public API ---------- */
@@ -256,7 +285,7 @@ export async function commitTransactions(rawRows, authData, fileName = "upload.x
         record_id: rid, branch_id, payment_source_id: sourceMap.get(r.payment_mode), transaction_id: r.transaction_id,
         external_ref: r.reference || null, amount: r.amount, currency: r.currency, payer_name: r.payer_name || null,
         payer_phone: r.payer_phone || null, payment_mode: r.payment_mode, transaction_at: r.transaction_at,
-        status: r.status, metadata: meta, ...base,
+        status: r.status, metadata: meta, rate: r.rate, rate_amount: r.charge, disbursed: r.disbursed, ...base,
       });
       r.flags.filter((f) => f !== "unverified").forEach((f) => {
         const diff = f === "possible_duplicate" ? 0 : r.amount - r.expected_amount;
@@ -269,7 +298,7 @@ export async function commitTransactions(rawRows, authData, fileName = "upload.x
         });
       });
     });
-    await bulk("payment_transactions", ["record_id", "branch_id", "payment_source_id", "transaction_id", "external_ref", "amount", "currency", "payer_name", "payer_phone", "payment_mode", "transaction_at", "status", "metadata", "hive_site_id", "hive_site_name"], txs);
+    await bulk("payment_transactions", ["record_id", "branch_id", "payment_source_id", "transaction_id", "external_ref", "amount", "currency", "payer_name", "payer_phone", "payment_mode", "transaction_at", "status", "metadata", "rate", "rate_amount", "disbursed", "hive_site_id", "hive_site_name"], txs);
     await bulk("business_events", ["record_id", "branch_id", "event_id", "event_type", "external_ref", "amount", "currency", "payment_mode", "occurred_at", "status", "metadata", "hive_site_id", "hive_site_name"], events);
     await bulk("exceptions", ["record_id", "branch_id", "event_id", "payment_transaction_id", "exception_type", "severity", "title", "description", "expected_amount", "actual_amount", "difference_amount", "status", "hive_site_id", "hive_site_name"], exceptions);
 
@@ -287,6 +316,36 @@ export async function commitTransactions(rawRows, authData, fileName = "upload.x
   } catch (err) {
     await conn.rollback();
     throw err;
+  } finally {
+    await conn.end();
+  }
+}
+
+/** Fill rate / charges / disbursed on already-imported transactions that have no rate. */
+export async function backfillRates(authData) {
+  const conn = await connectDB();
+  try {
+    const col = (c) => `CAST(NULLIF(b.${c}, '') AS DECIMAL(10,4))`;
+    const [res] = await conn.query(
+      `UPDATE ${T("payment_transactions")} t
+       JOIN (
+         SELECT p.record_id, COALESCE(
+             CASE LOWER(p.payment_mode)
+               WHEN 'cash' THEN ${col("transaction_rate_cash")}
+               WHEN 'card' THEN ${col("transaction_rate_card")}
+               WHEN 'mpesa' THEN ${col("transaction_rate_mpesa")}
+             END,
+             ${col("default_transaction_rate")}, 0) AS rate
+         FROM ${T("payment_transactions")} p
+         LEFT JOIN ${T("branches")} b ON b.record_id = p.branch_id
+         WHERE p.hive_site_id <=> ? AND (p.rate IS NULL OR p.rate = '')
+       ) x ON x.record_id = t.record_id
+       SET t.rate = x.rate,
+           t.rate_amount = ROUND(t.amount * x.rate / 100, 2),
+           t.disbursed = ROUND(t.amount - ROUND(t.amount * x.rate / 100, 2), 2)`,
+      [authData.hive_site_id ?? null]
+    );
+    return { updated: res.affectedRows };
   } finally {
     await conn.end();
   }
