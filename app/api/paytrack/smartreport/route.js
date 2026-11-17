@@ -44,8 +44,9 @@ export async function GET(request) {
     const chanArgs = channel ? [hive, channel] : [];
     const q = async (sql, args) => (await conn.query(sql, args))[0];
 
-    const inCols = `primkey, payment_mode, amount, rate_amount, disbursed, transaction_at AS at, metadata`;
-    const outCols = `primkey, payment_mode, amount, occurred_at AS at, metadata`;
+    const inCols = `primkey, payment_mode, amount, currency, rate_amount, disbursed, transaction_at AS at, metadata`;
+    const outCols = `primkey, payment_mode, amount, currency, occurred_at AS at, metadata`;
+    const currencyCount = {}; // the report shows the currency most used in the data
 
     const inRows = await q(
       `SELECT ${inCols} FROM ${T("payment_transactions")} WHERE hive_site_id <=> ? AND transaction_at BETWEEN ? AND ? ${chan("branch_id")}`,
@@ -57,10 +58,13 @@ export async function GET(request) {
     );
 
     // ---- money in, by mode (+ card origin, descriptions) ----
-    const inMap = {}, origin = {}, descCount = {}, importIds = new Set();
+    const inMap = {}, origin = {}, descCount = {}, inCat = {}, importIds = new Set();
     const balCandidates = [];
     for (const r of inRows) {
       const m = modeOf(r.payment_mode), md = meta(r.metadata);
+      if (r.currency) currencyCount[r.currency] = (currencyCount[r.currency] || 0) + 1;
+      const cat = String(md.category || "").trim();
+      if (cat) { inCat[cat] = inCat[cat] || { category: cat, n: 0, total: 0 }; inCat[cat].n++; inCat[cat].total += n(r.amount); }
       const a = (inMap[m] = inMap[m] || { mode: m, n: 0, total: 0, fees: 0, settled: 0 });
       a.n++; a.total += n(r.amount); a.fees += n(r.rate_amount); a.settled += n(r.disbursed);
       if (m === "card") {
@@ -82,6 +86,7 @@ export async function GET(request) {
     const outMap = {};
     for (const r of outRows) {
       const m = modeOf(r.payment_mode), md = meta(r.metadata);
+      if (r.currency) currencyCount[r.currency] = (currencyCount[r.currency] || 0) + 1;
       const cat = String(md.category || "").trim() || "Other payments";
       const a = (outMap[`${m}|${cat}`] = outMap[`${m}|${cat}`] || { mode: m, category: cat, n: 0, total: 0, fees: 0 });
       a.n++; a.total += n(r.amount); a.fees += n(md.charges);
@@ -140,6 +145,8 @@ export async function GET(request) {
       data: {
         merchant: channel || "All channels",
         period: { start, end },
+        currency: Object.entries(currencyCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "KES",
+        in_category: Object.values(inCat),
         in: Object.values(inMap),
         out: Object.values(outMap),
         card_origin: Object.values(origin),

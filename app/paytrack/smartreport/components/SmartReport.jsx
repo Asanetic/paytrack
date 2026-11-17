@@ -14,7 +14,7 @@ export default function SmartReport() {
   const today = new Date();
   const [form, setForm] = useState({
     channel: "", start: ymd(new Date(today.getFullYear(), today.getMonth(), 1)), end: ymd(today),
-    business: "hotel", demo: false, charts: true, notes: "",
+    business: "business", demo: false, charts: true, notes: "",
   });
   const [channels, setChannels] = useState([]);
   const [data, setData] = useState(null);

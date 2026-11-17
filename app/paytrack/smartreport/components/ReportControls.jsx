@@ -13,8 +13,8 @@ export default function ReportControls({ form, setForm, channels, onGenerate, on
       </label>
       <label>From<input type="date" value={form.start} onChange={set("start")} /></label>
       <label>To<input type="date" value={form.end} onChange={set("end")} /></label>
-      <label>Business type
-        <input type="text" value={form.business} onChange={set("business")} placeholder="hotel" style={{ width: 110 }} />
+      <label>Call the business
+        <input type="text" value={form.business} onChange={set("business")} placeholder="business" style={{ width: 110 }} title="Used in sentences, e.g. 'the hotel', 'the shop', 'the clinic'. Optional." />
       </label>
       <label className="or-check"><input type="checkbox" checked={form.charts} onChange={set("charts")} /> Include charts</label>
       <label className="or-check"><input type="checkbox" checked={form.demo} onChange={set("demo")} /> Mark as demonstration</label>

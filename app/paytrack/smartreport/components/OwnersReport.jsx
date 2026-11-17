@@ -45,6 +45,15 @@ export default function OwnersReport({ data, options }) {
         <H2>What this tells us</H2>
         {r.tells.map((t, i) => <P key={i}>{t}</P>)}
 
+        {r.sources && (
+          <>
+            <H2>Where the money came from</H2>
+            <Split charts={c} chart={<Donut title="Money in by category" items={r.chartSources} />}>
+              <DataTable headers={r.sources.headers} rows={r.sources.rows} total={r.sources.total} />
+            </Split>
+          </>
+        )}
+
         {r.card && (
           <>
             <H2>Card payments</H2>

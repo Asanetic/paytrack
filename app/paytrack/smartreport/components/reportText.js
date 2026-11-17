@@ -5,8 +5,11 @@
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 
-export const ksh = (v) => `KSh ${Number(v || 0).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const kshShort = (v) => `KSh ${Number(v || 0).toLocaleString("en-KE", { maximumFractionDigits: 2 })}`; // 184,300 (no .00)
+// currency label comes from the data (set at the start of buildReport); KES is shown as "KSh"
+let CUR = "KSh";
+const curLabel = (c) => { const u = String(c || "KES").toUpperCase(); return u === "KES" ? "KSh" : u; };
+export const ksh = (v) => `${CUR} ${Number(v || 0).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const kshShort = (v) => `${CUR} ${Number(v || 0).toLocaleString("en-KE", { maximumFractionDigits: 2 })}`; // 184,300 (no .00)
 const word = (k) => WORDS[k] ?? String(k);
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const list = (a) => (a.length <= 1 ? a.join("") : `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`);
@@ -42,6 +45,7 @@ function times(a, b) {
 
 /** data = API result, opts = { business: "hotel", demo: false, notes: "" } -> everything the pages render */
 export function buildReport(data, opts = {}) {
+  CUR = curLabel(data.currency);
   const biz = (opts.business || "business").trim() || "business";
   const BIZ = biz.toUpperCase();
   const demo = !!opts.demo;
@@ -72,7 +76,7 @@ export function buildReport(data, opts = {}) {
   const statements = modeKeys.map((m) => {
     const inN = data.in.filter((r) => r.mode === m).reduce((s, r) => s + r.n, 0);
     const outN = data.out.filter((r) => r.mode === m).reduce((s, r) => s + r.n, 0);
-    const shows = m === "card" ? "Guest card payments and card processing fees"
+    const shows = m === "card" ? "Customer card payments and card processing fees"
       : `${cap([inN && "money received", outN && "money paid out"].filter(Boolean).join(", "))} and ${mode(m).short} fees`;
     return { name: mode(m).statement, count: inN + outN, shows };
   }).sort((a, b) => b.count - a.count);
@@ -139,6 +143,14 @@ export function buildReport(data, opts = {}) {
     rows: origin.map((o) => [o.label, o.n, ksh(o.total)]),
     total: ["TOTAL", origin.reduce((s, o) => s + o.n, 0), ksh(origin.reduce((s, o) => s + o.total, 0))],
   } : null;
+  // revenue streams: only shown when the money-in rows carry a category (e.g. Rooms, Pharmacy, Hair, Groceries)
+  const cats = (data.in_category || []).filter((c) => c.category).sort((a, b) => b.total - a.total);
+  pages.sources = cats.length ? {
+    headers: ["Where the money came from", "Number of payments", "Total received"],
+    rows: cats.map((c) => [c.category, c.n, ksh(c.total)]),
+    total: ["TOTAL", cats.reduce((s, c) => s + c.n, 0), ksh(cats.reduce((s, c) => s + c.total, 0))],
+  } : null;
+  pages.chartSources = cats.map((c) => ({ label: c.category, value: c.total }));
   pages.simple = top && second ? `In simple terms: the ${biz} received more money through ${mode(top.mode).short} than through ${mode(second.mode).short} during the period covered by these ${demo ? "sample " : ""}records.` : "";
 
   // ---------- 2. money out ----------
@@ -150,8 +162,12 @@ export function buildReport(data, opts = {}) {
     rows: Object.entries(byCat).sort((a, b) => b[1].total - a[1].total).map(([k, v]) => [k, v.n, ksh(v.total)]),
     total: ["TOTAL", countOut, ksh(totalOut)],
   };
+  // built from the payment types actually found in the data, not from a fixed list
+  const catNames = Object.keys(byCat).filter((c) => c !== "Other payments").map((c) => c.toLowerCase());
   pages.whoReceived = [
-    `The descriptions suggest payments to suppliers, staff or service providers, utility companies, banks and cash withdrawals. However, a mobile-number payment is not automatically a salary or supplier payment. The ${biz} should confirm the recipient and purpose.`,
+    (catNames.length ? `The payment types recorded are ${list(catNames)}. ` : "") +
+    (catNames.some((c) => /mobile|phone/.test(c)) ? `A payment to a mobile number is not automatically a salary or supplier payment. ` : "") +
+    `The ${biz} should confirm who received each payment and why.`,
   ];
 
   // ---------- 3. charges ----------
@@ -190,7 +206,7 @@ export function buildReport(data, opts = {}) {
     ["What each payment was for", "Some payment descriptions do not identify the exact supplier, staff member or reason."],
   );
   if (card) pages.checks.push(["Card payments reaching the bank", "The card statement shows what was collected and the fees, but we need the bank statement to confirm when the money arrived in the bank."]);
-  pages.checks.push([`${cap(biz)} bills and bookings`, `We need the ${biz} booking or till records to confirm that payments match actual guest bills.`]);
+  pages.checks.push(["Sales and booking records", `We need the ${biz}'s sales, booking or till records to confirm that payments match actual customer bills.`]);
   pages.couldCheck = card
     ? (cardCheckOk
       ? `The card statement adds up correctly: card payments less card charges equal the card settlement amount. These are checks of the figures in the statements, not an independent audit of the ${biz}.`
@@ -199,8 +215,8 @@ export function buildReport(data, opts = {}) {
 
   // ---------- 6. recommendations ----------
   pages.recommend = [
-    `The ${biz} booking or till report. This helps confirm which guest bill each payment belongs to.`,
-    `The bank statement. This helps confirm that card payments were actually received in the bank account.`,
+    `The sales, booking or till report. This helps confirm which customer bill or sale each payment belongs to.`,
+    `The bank statement. This helps confirm that ${card ? "card " : ""}payments were actually received in the bank account.`,
     `A supplier list or invoice report. This helps identify who the ${biz} paid and what the payment was for.`,
     `The next month's statements. This helps show whether sales, spending and payment charges are going up or down.`,
   ];

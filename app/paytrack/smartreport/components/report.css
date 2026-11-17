@@ -70,7 +70,7 @@
   .or-report, .or-report * { visibility: visible !important; }
   /* span the full paper width and centre each A4 sheet, so left and right margins stay equal on any paper size */
   .or-report { position: absolute; left: 0; right: 0; top: 0; width: auto; display: block; }
-  .or-page { box-shadow: none; margin: 0 auto; page-break-after: always; break-after: page; height: 297mm; min-height: 0; overflow: hidden; }
+  .or-page { box-shadow: none; margin: 0 auto; page-break-after: always; break-after: page; min-height: 296mm; }  /* grows if a business has more rows, so nothing is ever cut off */
   .or-page:last-child { page-break-after: auto; break-after: auto; }
   .or-table tr, .or-card, .or-callout { break-inside: avoid; }
   .or-report, .or-report * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
