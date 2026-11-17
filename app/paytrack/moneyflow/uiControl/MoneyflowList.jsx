@@ -60,7 +60,7 @@ function paymentsBreakdowns(g) {
       key: 'by_branch',
       title: 'By Channel',
       type: 'bars',
-      items: sumBy((r) => r._branch_name_branch_id || r.branch_id),
+      items: sumBy((r) => r.branch_name || r.branch_id),
     },
     {
       key: 'by_month',
